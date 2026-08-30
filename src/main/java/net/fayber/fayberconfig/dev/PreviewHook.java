@@ -24,24 +24,44 @@ public final class PreviewHook {
 
     public static void register() {
         FayberConfigClient.LOGGER.info("Fayber Config preview hook armed");
+        // Optional scroll-offset support: -Dfayberconfig.previewScroll=<px> settles the demo
+        // list at that scroll offset one second after the screen opens, so captures can check
+        // sub-pixel rendering without timing races.
+        double scrollTarget = 0.0;
+        String scrollProp = System.getProperty("fayberconfig.previewScroll");
+        if (scrollProp != null) {
+            try {
+                scrollTarget = Double.parseDouble(scrollProp);
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        final double target = scrollTarget;
         ClientTickEvents.END_CLIENT_TICK.register(new ClientTickEvents.EndTick() {
             private int ticks = 0;
             private boolean opened = false;
+            private boolean scrolled = false;
 
             @Override
             public void onEndTick(net.minecraft.client.Minecraft client) {
-                if (this.opened) {
+                if (!this.opened) {
+                    if (!(client.screen instanceof TitleScreen)) {
+                        return;
+                    }
+                    if (++this.ticks < 20) {
+                        return;
+                    }
+                    this.opened = true;
+                    FayberConfigClient.LOGGER.info("PREVIEW: opening demo screen");
+                    client.setScreen(demoScreen());
                     return;
                 }
-                if (!(client.screen instanceof TitleScreen)) {
-                    return;
+                if (target > 0.0 && !this.scrolled && ++this.ticks >= 40) {
+                    this.scrolled = true;
+                    if (client.screen instanceof FayberConfigScreen screen) {
+                        screen.entryList().smoothScrollTo(target);
+                        FayberConfigClient.LOGGER.info("PREVIEW: scroll set to " + target);
+                    }
                 }
-                if (++this.ticks < 20) {
-                    return;
-                }
-                this.opened = true;
-                FayberConfigClient.LOGGER.info("PREVIEW: opening demo screen");
-                client.setScreen(demoScreen());
             }
         });
     }

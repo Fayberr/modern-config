@@ -5,13 +5,16 @@
 # config screen, grabs a single frame with ffmpeg, then tears everything down. Lets the GUI be
 # iterated on from a machine with no display.
 #
-# Usage: tools/preview.sh [output.png] [gui_scale] [wait_seconds]
+# Usage: tools/preview.sh [output.png] [gui_scale] [wait_seconds] [scroll_set]
+# scroll_set: settle the demo list at this scroll offset (in GUI px) before the capture,
+# e.g. 19.5 for a fractional offset to inspect sub-pixel rendering.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="${1:-/tmp/fayberconfig-preview.png}"
 GUI_SCALE="${2:-3}"
 WAIT="${3:-90}"
+SCROLL_SET="${4:-}"
 DISPLAY_NUM="${FC_DISPLAY:-:97}"
 W=1280
 H=720
@@ -44,6 +47,7 @@ LOG=/tmp/fayberconfig-preview.log
 (
 	cd "$HERE" || exit 1
 	DISPLAY="$DISPLAY_NUM" ./gradlew runClient -PfcPreview=true \
+		${SCROLL_SET:+-PfcPreviewScroll=$SCROLL_SET} \
 		-Dorg.gradle.java.home="$JDK" >>"$LOG" 2>&1
 ) &
 GRADLE_PID=$!
@@ -51,7 +55,9 @@ GRADLE_PID=$!
 # Wait for the hook to report that the demo screen is up.
 for ((i = 0; i < WAIT; i++)); do
 	if grep -q "PREVIEW: opening demo screen" "$LOG" 2>/dev/null; then
-		sleep 3
+		# Software rendering under Xvfb can run ticks slower than 20/s and the optional
+		# scroll offset is applied ~1s (of ticks) after the screen opens, so wait generously.
+		sleep 6
 		DISPLAY="$DISPLAY_NUM" ffmpeg -v error -f x11grab -video_size "${W}x${H}" \
 			-i "$DISPLAY_NUM" -frames:v 1 -y "$OUT" </dev/null
 		echo "captured: $OUT"

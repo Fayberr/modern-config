@@ -45,8 +45,9 @@ public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryLis
     /** Horizontal padding inside a card. */
     public static final int CARD_PADDING = 12;
     private static final float CARD_RADIUS = 6.0f;
-    /** Time-normalised scroll glide speed (per second); 0.45/frame at 60fps equals ~36/s. */
-    private static final double SCROLL_SPEED = 36.0;
+    /** Time-normalised scroll glide speed (per second). Slow enough that successive wheel
+     * notches blend into one continuous motion instead of stop-and-go steps. */
+    private static final double SCROLL_SPEED = 20.0;
     /** Below this many pixels of remaining travel the animation just settles. */
     private static final double SCROLL_SETTLE = 0.5;
     /** Frame gap cap so a stall never teleports the glide. */
@@ -103,6 +104,15 @@ public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryLis
         }
         this.scrollEased = this.scrollTarget = amount;
         super.setScrollAmount(amount);
+    }
+
+    /**
+     * Sets the wheel target directly; the eased glide then chases it (clamped to the scroll
+     * range in {@link #advanceSmoothScroll}). Also used by the preview workbench to hold the
+     * list at exact scroll offsets.
+     */
+    public void smoothScrollTo(double target) {
+        this.scrollTarget = target;
     }
 
     @Override

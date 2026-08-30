@@ -33,6 +33,9 @@ loom {
 			if (project.hasProperty('fcPreview')) {
 				vmArg '-Dfayberconfig.preview=true'
 			}
+			if (project.hasProperty('fcPreviewScroll')) {
+				vmArg "-Dfayberconfig.previewScroll=${project.property('fcPreviewScroll')}"
+			}
 		}
 	}
 }

@@ -75,6 +75,11 @@ public class FayberConfigScreen extends Screen {
         return new Builder(title, parent, onSave);
     }
 
+    /** The scrollable body; exposed so the preview workbench can hold it at scroll offsets. */
+    public ConfigEntryList entryList() {
+        return this.list;
+    }
+
     @Override
     protected void init() {
         for (ConfigEntry entry : this.entries) {
