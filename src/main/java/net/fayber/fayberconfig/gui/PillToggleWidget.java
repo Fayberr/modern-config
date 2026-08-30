@@ -10,17 +10,23 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * iOS-style pill toggle: rounded track (cyan when on, dark gray when off) with a white knob that
- * sits right when on and left when off. Reads its state through the entry's getter every frame,
- * so external changes show immediately, and writes through on press (live preview).
+ * Pill toggle: a capsule track (accent when on, neutral when off) with a round knob that slides
+ * between the ends. Reads its state through the entry's getter every frame, so external changes
+ * show immediately, and writes through on press (live preview).
+ *
+ * <p>The knob eases towards its target each frame, which is what makes a toggle feel like an app
+ * control rather than a checkbox.
  */
 public class PillToggleWidget extends AbstractButton {
-    private static final int TRACK_W = 40;
-    private static final int TRACK_H = 16;
-    private static final int KNOB = 12;
+    private static final int TRACK_W = 34;
+    private static final int TRACK_H = 18;
+    private static final float KNOB_INSET = 2.5f;
 
     private final Supplier<Boolean> getter;
     private final Consumer<Boolean> setter;
+
+    /** 0 = off position, 1 = on position; negative means "not initialised yet". */
+    private float knobPos = -1.0f;
 
     public PillToggleWidget(int x, int y, Supplier<Boolean> getter, Consumer<Boolean> setter) {
         super(x, y, TRACK_W, TRACK_H, Component.empty());
@@ -30,19 +36,30 @@ public class PillToggleWidget extends AbstractButton {
 
     @Override
     public void onPress(InputWithModifiers input) {
-        this.setter.accept(!this.getter.get());
+        this.setter.accept(!Boolean.TRUE.equals(this.getter.get()));
     }
 
     @Override
     protected void extractContents(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
         boolean on = Boolean.TRUE.equals(this.getter.get());
-        int track = on ? GuiUtil.ACCENT : GuiUtil.OFF_TRACK;
-        GuiUtil.fillRound(gfx, this.getX(), this.getY(), this.getWidth(), this.getHeight(), this.getHeight() / 2, track);
-        int knobX = on
-                ? this.getX() + this.getWidth() - KNOB - 2
-                : this.getX() + 2;
-        int knobY = this.getY() + (TRACK_H - KNOB) / 2;
-        GuiUtil.fillRound(gfx, knobX, knobY, KNOB, KNOB, KNOB / 2, GuiUtil.TEXT);
+        float target = on ? 1.0f : 0.0f;
+        if (this.knobPos < 0.0f) {
+            this.knobPos = target; // opening the screen should not animate every toggle
+        } else {
+            this.knobPos += (target - this.knobPos) * 0.35f;
+        }
+
+        boolean hovered = this.isHoveredOrFocused();
+        int track = on
+                ? (hovered ? GuiUtil.ACCENT_HOVER : GuiUtil.ACCENT)
+                : (hovered ? GuiUtil.SLIDER_TRACK_HOVER : GuiUtil.OFF_TRACK);
+        Ui.pill(gfx, this.getX(), this.getY(), this.getWidth(), this.getHeight(), track);
+
+        float knobRadius = this.getHeight() / 2.0f - KNOB_INSET;
+        float left = this.getX() + KNOB_INSET + knobRadius;
+        float right = this.getX() + this.getWidth() - KNOB_INSET - knobRadius;
+        float cx = left + (right - left) * this.knobPos;
+        Ui.circle(gfx, cx, this.getY() + this.getHeight() / 2.0f, knobRadius, GuiUtil.TEXT);
     }
 
     @Override

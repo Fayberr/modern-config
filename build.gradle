@@ -23,6 +23,20 @@ dependencies {
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 }
 
+// Dev-only design workbench: `./gradlew runClient -PfcPreview=true` boots the client at a fixed
+// window size and auto-opens the demo config screen (see tools/preview.sh, which grabs a frame
+// off an Xvfb display so the look can be iterated on headlessly).
+loom {
+	runs {
+		client {
+			programArgs '--width', '1280', '--height', '720'
+			if (project.hasProperty('fcPreview')) {
+				vmArg '-Dfayberconfig.preview=true'
+			}
+		}
+	}
+}
+
 processResources {
 	inputs.property 'version', project.version
 	inputs.property 'minecraft_version', project.minecraft_version

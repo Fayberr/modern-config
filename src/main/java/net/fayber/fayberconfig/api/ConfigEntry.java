@@ -4,6 +4,7 @@ import net.fayber.fayberconfig.gui.ConfigEntryList;
 import net.fayber.fayberconfig.gui.DoubleSliderWidget;
 import net.fayber.fayberconfig.gui.FlatButton;
 import net.fayber.fayberconfig.gui.FloatSliderWidget;
+import net.fayber.fayberconfig.gui.GuiUtil;
 import net.fayber.fayberconfig.gui.IntSliderWidget;
 import net.fayber.fayberconfig.gui.PillToggleWidget;
 import net.minecraft.client.Minecraft;
@@ -328,10 +329,12 @@ public interface ConfigEntry {
 
         @Override
         public ConfigEntryList.Row createRow() {
-            EditBox box = new EditBox(Minecraft.getInstance().font, 0, 0, 140, 16, this.label);
+            // EditBox renders raw strings, not styled Components, so its text stays in the vanilla
+            // font; it is drawn borderless and right of the label so it reads as a value, not a box.
+            EditBox box = new EditBox(Minecraft.getInstance().font, 0, 0, 150, 20, this.label);
             box.setMaxLength(this.maxLength);
             box.setBordered(false);
-            box.setTextColor(0xFFFFFFFF);
+            box.setTextColor(GuiUtil.TEXT);
             box.setValue(this.getter.get());
             box.setResponder(this.setter::accept);
             return new ConfigEntryList.WidgetRow(this.label, this.tooltip, box);
@@ -374,7 +377,7 @@ public interface ConfigEntry {
 
         @Override
         public ConfigEntryList.Row createRow() {
-            FlatButton flat = new FlatButton(0, 0, 110, 16, this.label, this.onPress);
+            FlatButton flat = new FlatButton(0, 0, 110, 22, this.label, this.onPress);
             return new ConfigEntryList.WidgetRow(Component.empty(), this.tooltip, flat);
         }
     }

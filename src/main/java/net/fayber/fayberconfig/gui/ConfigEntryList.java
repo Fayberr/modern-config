@@ -10,23 +10,33 @@ import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.network.chat.Component;
 
 import java.util.List;
+import java.util.Locale;
 
 /**
- * The scrollable body of a Fayber Config screen: uniform 26px rows, each drawn as its own rounded
- * dark card (hover brightens). Rows are {@link ContainerObjectSelectionList.Entry}s whose real
- * child widgets are hit-tested/focused through the entry's {@code children()} dispatch, exactly
- * like the vanilla KeyBindsList pattern: {@code extractContent} repositions children from the
- * row's content coords (scroll/resize-safe) and then calls their final
- * {@code extractRenderState}.
+ * The scrollable body of a Fayber Config screen: one rounded card per option, a slim rounded
+ * scrollbar, and no vanilla list chrome (background, separators and the sprite scrollbar are all
+ * replaced).
  *
- * <p>The vanilla list background and separators are overridden to no-ops; the screen draws its
- * own rounded panel behind the whole list.
+ * <p>Rows are {@link ContainerObjectSelectionList.Entry}s whose real child widgets are
+ * hit-tested/focused through the entry's {@code children()} dispatch, exactly like the vanilla
+ * KeyBindsList pattern: {@code extractContent} repositions children from the row's content coords
+ * (scroll/resize-safe) and then calls their final {@code extractRenderState}.
  */
 public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryList.Row> {
-    public static final int ROW_HEIGHT = 26;
+    /** Card height; the row pitch adds the gap on top of this. */
+    public static final int CARD_HEIGHT = 34;
+    /** Vertical gap between cards. */
+    public static final int ROW_GAP = 4;
+    public static final int ROW_HEIGHT = CARD_HEIGHT + ROW_GAP;
+    /** Horizontal padding inside a card. */
+    public static final int CARD_PADDING = 12;
+    private static final float CARD_RADIUS = 6.0f;
 
-    public ConfigEntryList(Minecraft mc, int width, int height, int y0, List<Row> rows) {
+    private final int rowWidth;
+
+    public ConfigEntryList(Minecraft mc, int width, int height, int y0, int rowWidth, List<Row> rows) {
         super(mc, width, height, y0, ROW_HEIGHT);
+        this.rowWidth = rowWidth;
         for (Row row : rows) {
             this.addEntry(row);
         }
@@ -34,17 +44,32 @@ public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryLis
 
     @Override
     public int getRowWidth() {
-        return Math.min(380, this.getWidth() - 24);
+        return Math.min(this.rowWidth, this.getWidth() - 24);
     }
 
     @Override
     protected void extractListBackground(GuiGraphicsExtractor gfx) {
-        // The screen draws its own rounded panel; no vanilla list background.
+        // The screen draws its own rounded panel.
     }
 
     @Override
     protected void extractListSeparators(GuiGraphicsExtractor gfx) {
         // No vanilla row separators.
+    }
+
+    @Override
+    protected void extractScrollbar(GuiGraphicsExtractor gfx, int mouseX, int mouseY) {
+        if (!this.scrollable()) {
+            return;
+        }
+        // Slim rounded scrollbar instead of the vanilla sprite one.
+        float w = 4.0f;
+        float x = this.scrollBarX() + (this.scrollbarWidth() - w) / 2.0f;
+        boolean hovered = mouseX >= x - 3.0f && mouseX <= x + w + 3.0f
+                && mouseY >= this.getY() && mouseY <= this.getY() + this.getHeight();
+        Ui.pill(gfx, x, this.getY() + 2, w, this.getHeight() - 4, GuiUtil.CARD);
+        Ui.pill(gfx, x, this.scrollBarY(), w, this.scrollerHeight(),
+                hovered ? GuiUtil.SCROLLBAR_HOVER : GuiUtil.SCROLLBAR);
     }
 
     /** Base row: draws its own rounded card; interactive children live in {@link #children()}. */
@@ -59,20 +84,29 @@ public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryLis
             return (List<? extends NarratableEntry>) (List<?>) this.children();
         }
 
+        /** Card top edge; the row pitch includes the gap, the card does not. */
+        protected int cardY() {
+            return this.getY();
+        }
+
         protected void drawRowCard(GuiGraphicsExtractor gfx, boolean hovered) {
-            GuiUtil.fillRoundCard(gfx,
-                    this.getX(), this.getY() + 1, this.getWidth(), this.getHeight() - 2, 3,
-                    hovered ? GuiUtil.CARD_BORDER_HOVER : GuiUtil.CARD_BORDER,
-                    hovered ? GuiUtil.CARD_HOVER : GuiUtil.CARD);
+            Ui.roundRectBorder(gfx, this.getX(), this.cardY(), this.getWidth(), CARD_HEIGHT, CARD_RADIUS,
+                    hovered ? GuiUtil.CARD_HOVER : GuiUtil.CARD,
+                    hovered ? GuiUtil.CARD_BORDER_HOVER : GuiUtil.CARD_BORDER, 1.0f);
+        }
+
+        /** Baseline for a single line of text vertically centred in the card. */
+        protected int textY() {
+            return this.cardY() + (CARD_HEIGHT - Ui.font().lineHeight) / 2 + 1;
         }
     }
 
-    /** Category title row (non-interactive). */
+    /** Category title row: a small muted all-caps label, no card. */
     public static class HeaderRow extends Row {
         private final Component title;
 
         public HeaderRow(Component title) {
-            this.title = title;
+            this.title = Ui.uiBold(title.getString().toUpperCase(Locale.ROOT));
         }
 
         @Override
@@ -82,8 +116,8 @@ public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryLis
 
         @Override
         public void extractContent(GuiGraphicsExtractor gfx, int mouseX, int mouseY, boolean hovered, float partialTick) {
-            gfx.text(Minecraft.getInstance().font, this.title,
-                    this.getContentX() + 6, this.getContentYMiddle() - 4, GuiUtil.ACCENT);
+            int y = this.cardY() + CARD_HEIGHT - Ui.font().lineHeight - 4;
+            Ui.text(gfx, this.title, this.getX() + 2, y, GuiUtil.TEXT_MUTED);
         }
     }
 
@@ -96,10 +130,10 @@ public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryLis
         private final AbstractWidget widget;
 
         public WidgetRow(Component label, Component tooltip, AbstractWidget widget) {
-            this.label = label;
+            this.label = Ui.ui(label);
             this.widget = widget;
             if (tooltip != null) {
-                widget.setTooltip(Tooltip.create(tooltip));
+                widget.setTooltip(Tooltip.create(Ui.ui(tooltip)));
             }
         }
 
@@ -111,11 +145,10 @@ public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryLis
         @Override
         public void extractContent(GuiGraphicsExtractor gfx, int mouseX, int mouseY, boolean hovered, float partialTick) {
             this.drawRowCard(gfx, hovered);
-            gfx.text(Minecraft.getInstance().font, this.label,
-                    this.getX() + 10, this.getContentYMiddle() - 4, GuiUtil.TEXT);
+            Ui.text(gfx, this.label, this.getX() + CARD_PADDING, this.textY(), GuiUtil.TEXT);
             this.widget.setPosition(
-                    this.getX() + this.getWidth() - this.widget.getWidth() - 10,
-                    this.getContentYMiddle() - this.widget.getHeight() / 2);
+                    this.getX() + this.getWidth() - this.widget.getWidth() - CARD_PADDING,
+                    this.cardY() + (CARD_HEIGHT - this.widget.getHeight()) / 2);
             this.widget.extractRenderState(gfx, mouseX, mouseY, partialTick);
         }
     }
@@ -139,8 +172,8 @@ public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryLis
         @Override
         public void extractContent(GuiGraphicsExtractor gfx, int mouseX, int mouseY, boolean hovered, float partialTick) {
             this.drawRowCard(gfx, hovered);
-            this.slider.setPosition(this.getX() + 8, this.getY() + 1);
-            this.slider.setWidth(this.getWidth() - 16);
+            this.slider.setPosition(this.getX(), this.cardY());
+            this.slider.setWidth(this.getWidth());
             this.slider.extractRenderState(gfx, mouseX, mouseY, partialTick);
         }
     }

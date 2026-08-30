@@ -20,5 +20,10 @@ public class FayberConfigClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         LOGGER.info("Fayber Config initialized");
+
+        // Design workbench, only ever active with -Dfayberconfig.preview=true (dev runs).
+        if (net.fayber.fayberconfig.dev.PreviewHook.enabled()) {
+            net.fayber.fayberconfig.dev.PreviewHook.register();
+        }
     }
 }
