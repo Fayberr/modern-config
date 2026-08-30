@@ -25,7 +25,8 @@ public class FloatSliderWidget extends StyledSlider {
     protected void applyValue() {
         float v = (float) this.snappedValue();
         this.setter.accept(v);
-        this.resnapKnob();
+        // No knob re-snap here: the knob follows the raw drag position (StyledSlider) and only
+        // the written value snaps, so dragging feels smooth.
     }
 
     @Override
