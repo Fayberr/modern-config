@@ -25,44 +25,65 @@ import net.minecraft.resources.Identifier;
  * </ol>
  *
  * <p>Text uses the bundled Inter font via {@link #ui}/{@link #uiBold} rather than the vanilla
- * bitmap font.
+ * bitmap font, at a rasterisation that matches the monitor exactly (see {@link #style}).
  */
 public final class Ui {
-    /** Bundled Inter (regular), applied through a text {@link Style}. */
-    public static final Identifier FONT = Identifier.fromNamespaceAndPath("fayberconfig", "ui");
-    /** Bundled Inter (semibold), for titles and emphasis. */
-    public static final Identifier FONT_BOLD = Identifier.fromNamespaceAndPath("fayberconfig", "ui_bold");
+    /**
+     * The font is bundled once per GUI scale. Minecraft rasterises a TTF glyph at
+     * {@code size * oversample} texels and then draws it {@code size} GUI pixels tall, so on screen
+     * one texel covers {@code oversample / guiScale} pixels, and the glyph atlas is sampled
+     * NEAREST ({@code FontTexture} uses {@code SamplerCache.getRepeat(FilterMode.NEAREST)}).
+     *
+     * <p>Any ratio other than 1 therefore resamples the glyph with no filtering, which is what makes
+     * TTF text in Minecraft look subtly jagged: a single fixed {@code oversample} is only ever right
+     * at one GUI scale. Picking the variant whose oversample equals the current GUI scale makes it
+     * exactly one texel per physical pixel, and it also makes every glyph advance and bearing
+     * (which Minecraft stores as {@code raster / oversample}) land on a whole physical pixel.
+     */
+    private static final int MAX_SCALE = 6;
 
-    // 26.1 selects fonts through FontDescription, not a bare Identifier.
-    private static final FontDescription FONT_DESC = new FontDescription.Resource(FONT);
-    private static final FontDescription FONT_BOLD_DESC = new FontDescription.Resource(FONT_BOLD);
+    private static final Style[] STYLES = new Style[MAX_SCALE + 1];
+    private static final Style[] STYLES_BOLD = new Style[MAX_SCALE + 1];
 
-    private static final Style STYLE = Style.EMPTY.withFont(FONT_DESC);
-    private static final Style STYLE_BOLD = Style.EMPTY.withFont(FONT_BOLD_DESC);
+    static {
+        for (int i = 1; i <= MAX_SCALE; i++) {
+            // 26.1 selects fonts through FontDescription, not a bare Identifier.
+            STYLES[i] = Style.EMPTY.withFont(new FontDescription.Resource(
+                    Identifier.fromNamespaceAndPath("fayberconfig", "ui_x" + i)));
+            STYLES_BOLD[i] = Style.EMPTY.withFont(new FontDescription.Resource(
+                    Identifier.fromNamespaceAndPath("fayberconfig", "ui_bold_x" + i)));
+        }
+    }
 
     private Ui() {
     }
 
     // ---------------------------------------------------------------- text
 
+    /** The Inter style whose rasterisation matches the current GUI scale one texel per pixel. */
+    private static Style style(boolean bold) {
+        int i = Math.clamp(Math.round(scale()), 1, MAX_SCALE);
+        return bold ? STYLES_BOLD[i] : STYLES[i];
+    }
+
     /** Wraps text in the Inter UI font. */
     public static Component ui(String text) {
-        return Component.literal(text).setStyle(STYLE);
+        return Component.literal(text).setStyle(style(false));
     }
 
     /** Wraps text in the Inter UI font, semibold. */
     public static Component uiBold(String text) {
-        return Component.literal(text).setStyle(STYLE_BOLD);
+        return Component.literal(text).setStyle(style(true));
     }
 
     /** Re-styles an arbitrary component (and its children) into the Inter UI font. */
     public static Component ui(Component text) {
-        return text.copy().setStyle(text.getStyle().withFont(FONT_DESC));
+        return text.copy().setStyle(text.getStyle().withFont(style(false).getFont()));
     }
 
     /** Re-styles an arbitrary component into the semibold Inter UI font. */
     public static Component uiBold(Component text) {
-        return text.copy().setStyle(text.getStyle().withFont(FONT_BOLD_DESC));
+        return text.copy().setStyle(text.getStyle().withFont(style(true).getFont()));
     }
 
     public static Font font() {

@@ -7,37 +7,39 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
  * needs. Shapes are drawn by {@link Ui} at physical-pixel resolution through an anti-aliased
  * corner shader, so nothing here lands on the chunky GUI-pixel grid.
  *
- * <p>The palette is a dark neutral ramp with a single cyan accent, matching the Waypoints in-world
- * label card so the whole mod family reads as one product.
+ * <p>The palette is a genuinely neutral dark ramp: the surface greys have equal R/G/B so nothing
+ * reads as tinted, and the only colour in the whole screen is one soft blue on the interactive
+ * bits (toggles, slider fill, the confirming button).
  */
 public final class GuiUtil {
     private GuiUtil() {
     }
 
     /** Dim laid over the world/menu behind the panel. */
-    public static final int SCRIM = 0xA6000000;
+    public static final int SCRIM = 0xB3000000;
 
-    public static final int PANEL = 0xFF0E1116;
-    public static final int PANEL_BORDER = 0xFF232932;
+    public static final int PANEL = 0xFF121212;
+    public static final int PANEL_BORDER = 0xFF2A2A2A;
 
-    public static final int CARD = 0xFF161A21;
-    public static final int CARD_HOVER = 0xFF1D222B;
-    public static final int CARD_BORDER = 0xFF232932;
-    public static final int CARD_BORDER_HOVER = 0xFF2E3643;
+    public static final int CARD = 0xFF1A1A1A;
+    public static final int CARD_HOVER = 0xFF222222;
+    public static final int CARD_BORDER = 0xFF262626;
+    public static final int CARD_BORDER_HOVER = 0xFF343434;
 
-    public static final int TEXT = 0xFFF2F4F7;
-    public static final int TEXT_SECONDARY = 0xFF98A2B0;
-    public static final int TEXT_MUTED = 0xFF6C7684;
-    public static final int TEXT_ON_ACCENT = 0xFF06222A;
+    public static final int TEXT = 0xFFF0F0F0;
+    public static final int TEXT_SECONDARY = 0xFFA3A3A3;
+    public static final int TEXT_MUTED = 0xFF6E6E6E;
+    /** Dark label for text sitting on top of the accent fill. */
+    public static final int TEXT_ON_ACCENT = 0xFF0F1319;
 
-    public static final int ACCENT = 0xFF00E5FF;
-    public static final int ACCENT_HOVER = 0xFF5CF0FF;
+    public static final int ACCENT = 0xFF7AA2F7;
+    public static final int ACCENT_HOVER = 0xFF98B7FF;
 
-    public static final int OFF_TRACK = 0xFF2B323C;
-    public static final int SLIDER_TRACK = 0xFF262C36;
-    public static final int SLIDER_TRACK_HOVER = 0xFF2E3642;
-    public static final int SCROLLBAR = 0xFF2B323C;
-    public static final int SCROLLBAR_HOVER = 0xFF3B4453;
+    public static final int OFF_TRACK = 0xFF3A3A3A;
+    public static final int SLIDER_TRACK = 0xFF2E2E2E;
+    public static final int SLIDER_TRACK_HOVER = 0xFF383838;
+    public static final int SCROLLBAR = 0xFF3A3A3A;
+    public static final int SCROLLBAR_HOVER = 0xFF4D4D4D;
 
     /** Filled rounded rectangle. */
     public static void fillRound(GuiGraphicsExtractor gfx, float x, float y, float w, float h, float radius, int color) {

@@ -64,7 +64,8 @@ public class FayberConfigScreen extends Screen {
     private int panelH;
 
     FayberConfigScreen(Component title, @Nullable Screen parent, @Nullable Runnable onSave, List<ConfigEntry> entries) {
-        super(Ui.uiBold(title));
+        // Kept raw: the Inter variant depends on the GUI scale, so it is applied at draw time.
+        super(title);
         this.parent = parent;
         this.onSave = onSave;
         this.entries = entries;
@@ -142,7 +143,7 @@ public class FayberConfigScreen extends Screen {
         Ui.roundRectBorder(gfx, this.panelX, this.panelY, this.panelW, this.panelH, PANEL_RADIUS,
                 GuiUtil.PANEL, GuiUtil.PANEL_BORDER, 1.0f);
 
-        Ui.text(gfx, this.title, this.panelX + CONTENT_INSET,
+        Ui.text(gfx, Ui.uiBold(this.title), this.panelX + CONTENT_INSET,
                 this.panelY + (HEADER_HEIGHT - Ui.font().lineHeight) / 2, GuiUtil.TEXT);
 
         // Hairlines separating the title bar and the button bar from the scrolling body.
