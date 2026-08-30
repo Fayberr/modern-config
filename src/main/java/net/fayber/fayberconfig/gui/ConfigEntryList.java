@@ -21,6 +21,11 @@ import java.util.Locale;
  * hit-tested/focused through the entry's {@code children()} dispatch, exactly like the vanilla
  * KeyBindsList pattern: {@code extractContent} repositions children from the row's content coords
  * (scroll/resize-safe) and then calls their final {@code extractRenderState}.
+ *
+ * <p>Mouse-wheel scrolling is animated (vanilla's is instant): the wheel only moves a target,
+ * and every frame the actual scroll amount eases toward it. Authoritative scroll changes that
+ * are not wheel-driven (scrollbar drag, keyboard, scrollToEntry) bypass the animation and stay
+ * instant, so dragging the thumb keeps up with the pointer 1:1.
  */
 public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryList.Row> {
     /** Card height; the row pitch adds the gap on top of this. */
@@ -31,8 +36,19 @@ public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryLis
     /** Horizontal padding inside a card. */
     public static final int CARD_PADDING = 12;
     private static final float CARD_RADIUS = 6.0f;
+    /** Per-frame ease of the actual scroll amount toward the wheel target. */
+    private static final double SCROLL_EASE = 0.45;
+    /** Below this many pixels of remaining travel the animation just settles. */
+    private static final double SCROLL_SETTLE = 0.5;
 
     private final int rowWidth;
+
+    /** Where the wheel wants the scroll to be; the actual amount eases toward this. */
+    private double scrollTarget;
+    /** The scroll amount last applied; eased toward {@link #scrollTarget} once per frame. */
+    private double scrollEased;
+    /** Set while the eased amount is being applied, so {@link #setScrollAmount} passes through. */
+    private boolean applyingEasedScroll;
 
     public ConfigEntryList(Minecraft mc, int width, int height, int y0, int rowWidth, List<Row> rows) {
         super(mc, width, height, y0, ROW_HEIGHT);
@@ -45,6 +61,65 @@ public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryLis
     @Override
     public int getRowWidth() {
         return Math.min(this.rowWidth, this.getWidth() - 24);
+    }
+
+    /**
+     * Wheel input only moves the animation target; the actual scroll amount chases it in
+     * {@link #extractWidgetRenderState}. Sign and rate match vanilla's own wheel handling
+     * ({@code scrollAmount - yDelta * scrollRate()}).
+     */
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double xDelta, double yDelta) {
+        if (!this.scrollable()) {
+            return super.mouseScrolled(mouseX, mouseY, xDelta, yDelta);
+        }
+        this.scrollTarget = Math.clamp(this.scrollTarget - yDelta * this.scrollRate(),
+                0.0, this.maxScrollAmount());
+        return true;
+    }
+
+    /**
+     * Every scroll change that is not ours (scrollbar drag, keyboard, scrollToEntry) is
+     * authoritative: snap the animation state to it and apply it instantly.
+     */
+    @Override
+    public void setScrollAmount(double amount) {
+        if (this.applyingEasedScroll) {
+            super.setScrollAmount(amount);
+            return;
+        }
+        this.scrollEased = this.scrollTarget = amount;
+        super.setScrollAmount(amount);
+    }
+
+    @Override
+    public void extractWidgetRenderState(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
+        // Ease before super so the rows, scrollbar and separators all extract from the freshly
+        // eased amount in the same frame.
+        this.advanceSmoothScroll();
+        super.extractWidgetRenderState(gfx, mouseX, mouseY, partialTick);
+    }
+
+    /** Moves the eased scroll amount toward the wheel target and applies it to the list. */
+    private void advanceSmoothScroll() {
+        if (this.scrollable()) {
+            this.scrollTarget = Math.clamp(this.scrollTarget, 0.0, this.maxScrollAmount());
+            if (Math.abs(this.scrollTarget - this.scrollEased) <= SCROLL_SETTLE) {
+                this.scrollEased = this.scrollTarget;
+            } else {
+                this.scrollEased += (this.scrollTarget - this.scrollEased) * SCROLL_EASE;
+            }
+        } else {
+            this.scrollTarget = 0.0;
+            this.scrollEased = 0.0;
+        }
+        if (this.scrollEased != this.scrollAmount()) {
+            this.applyingEasedScroll = true;
+            super.setScrollAmount(this.scrollEased);
+            this.applyingEasedScroll = false;
+            // The super setter clamps; keep our state in sync with what actually applied.
+            this.scrollEased = this.scrollTarget = this.scrollAmount();
+        }
     }
 
     @Override
