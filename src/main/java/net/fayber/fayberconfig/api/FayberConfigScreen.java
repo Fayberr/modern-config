@@ -143,40 +143,45 @@ public class FayberConfigScreen extends Screen {
             return this;
         }
 
-        public ConfigEntry.Bool bool(String label, Supplier<Boolean> getter, Consumer<Boolean> setter) {
-            ConfigEntry.Bool entry = new ConfigEntry.Bool(label, getter, setter);
-            this.entries.add(entry);
-            return entry;
+        /**
+         * Attaches a tooltip to the most recently added entry. Kept as a separate builder step
+         * so entry methods can return the Builder and chain fluently.
+         */
+        public Builder tooltip(String tooltip) {
+            if (!this.entries.isEmpty()) {
+                this.entries.get(this.entries.size() - 1).tooltip(tooltip);
+            }
+            return this;
         }
 
-        public ConfigEntry.IntSlider intSlider(String label, IntSupplier getter, IntConsumer setter, int min, int max, int step) {
-            ConfigEntry.IntSlider entry = new ConfigEntry.IntSlider(label, getter, setter, min, max, step);
-            this.entries.add(entry);
-            return entry;
+        public Builder bool(String label, Supplier<Boolean> getter, Consumer<Boolean> setter) {
+            this.entries.add(new ConfigEntry.Bool(label, getter, setter));
+            return this;
         }
 
-        public ConfigEntry.FloatSlider floatSlider(String label, Supplier<Float> getter, Consumer<Float> setter, float min, float max, float step) {
-            ConfigEntry.FloatSlider entry = new ConfigEntry.FloatSlider(label, getter, setter, min, max, step);
-            this.entries.add(entry);
-            return entry;
+        public Builder intSlider(String label, IntSupplier getter, IntConsumer setter, int min, int max, int step) {
+            this.entries.add(new ConfigEntry.IntSlider(label, getter, setter, min, max, step));
+            return this;
         }
 
-        public ConfigEntry.DoubleSlider doubleSlider(String label, Supplier<Double> getter, Consumer<Double> setter, double min, double max, double step) {
-            ConfigEntry.DoubleSlider entry = new ConfigEntry.DoubleSlider(label, getter, setter, min, max, step);
-            this.entries.add(entry);
-            return entry;
+        public Builder floatSlider(String label, Supplier<Float> getter, Consumer<Float> setter, float min, float max, float step) {
+            this.entries.add(new ConfigEntry.FloatSlider(label, getter, setter, min, max, step));
+            return this;
         }
 
-        public ConfigEntry.Text text(String label, Supplier<String> getter, Consumer<String> setter, int maxLength) {
-            ConfigEntry.Text entry = new ConfigEntry.Text(label, getter, setter, maxLength);
-            this.entries.add(entry);
-            return entry;
+        public Builder doubleSlider(String label, Supplier<Double> getter, Consumer<Double> setter, double min, double max, double step) {
+            this.entries.add(new ConfigEntry.DoubleSlider(label, getter, setter, min, max, step));
+            return this;
         }
 
-        public ConfigEntry.Button button(String label, Runnable onPress) {
-            ConfigEntry.Button entry = new ConfigEntry.Button(label, onPress);
-            this.entries.add(entry);
-            return entry;
+        public Builder text(String label, Supplier<String> getter, Consumer<String> setter, int maxLength) {
+            this.entries.add(new ConfigEntry.Text(label, getter, setter, maxLength));
+            return this;
+        }
+
+        public Builder button(String label, Runnable onPress) {
+            this.entries.add(new ConfigEntry.Button(label, onPress));
+            return this;
         }
 
         public FayberConfigScreen build() {

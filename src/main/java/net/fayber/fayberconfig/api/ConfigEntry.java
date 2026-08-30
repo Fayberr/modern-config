@@ -32,6 +32,12 @@ public interface ConfigEntry {
     @Nullable
     Component tooltip();
 
+    /**
+     * Sets the tooltip text and returns the entry for chaining. The Builder's
+     * {@code .tooltip(...)} calls this on the most recently added entry.
+     */
+    ConfigEntry tooltip(String tooltip);
+
     /** Records the current value (called once when the screen opens). */
     void snapshot();
 
@@ -56,6 +62,11 @@ public interface ConfigEntry {
         @Override
         public Component tooltip() {
             return null;
+        }
+
+        @Override
+        public Header tooltip(String tooltip) {
+            return this; // headers have no tooltip
         }
 
         @Override
