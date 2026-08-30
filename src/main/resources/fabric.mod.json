@@ -1,0 +1,27 @@
+{
+	"schemaVersion": 1,
+	"id": "fayberconfig",
+	"version": "${version}",
+	"name": "Fayber Config",
+	"description": "Slim, modern config screens for Fayber's mods. Dark rounded-card UI with live preview, cancel-restore and tooltips. Optional: mods fall back to their built-in screens when absent.",
+	"authors": [
+		"Fayber"
+	],
+	"contact": {
+		"homepage": "https://github.com/Fayberr/fayber-config",
+		"sources": "https://github.com/Fayberr/fayber-config"
+	},
+	"license": "GPL-3.0-or-later",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"net.fayber.fayberconfig.FayberConfigClient"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=${loader_version}",
+		"minecraft": ">=26.1 <26.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
