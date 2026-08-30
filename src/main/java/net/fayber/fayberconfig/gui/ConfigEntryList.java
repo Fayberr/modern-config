@@ -8,6 +8,7 @@ import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Util;
 
 import java.util.List;
 import java.util.Locale;
@@ -23,9 +24,17 @@ import java.util.Locale;
  * (scroll/resize-safe) and then calls their final {@code extractRenderState}.
  *
  * <p>Mouse-wheel scrolling is animated (vanilla's is instant): the wheel only moves a target,
- * and every frame the actual scroll amount eases toward it. Authoritative scroll changes that
- * are not wheel-driven (scrollbar drag, keyboard, scrollToEntry) bypass the animation and stay
- * instant, so dragging the thumb keeps up with the pointer 1:1.
+ * and every frame the actual scroll amount eases toward it with a time-normalised factor, so the
+ * glide feels identical at any frame rate. Authoritative scroll changes that are not wheel-driven
+ * (scrollbar drag, keyboard, scrollToEntry) bypass the animation and stay instant, so dragging the
+ * thumb keeps up with the pointer 1:1.
+ *
+ * <p>Vanilla positions rows at {@code firstEntryY - (int) scrollAmount} and the scrollbar thumb
+ * from an integer-division formula: both drop the fractional part of the scroll amount, which
+ * makes any fractional scroll (this animation, or a trackpad) move content in whole-GUI-pixel
+ * stair-steps. Rows are therefore drawn through {@link #extractItem} with the pose shifted back
+ * by the dropped fraction (true sub-pixel motion; hit-testing keeps the int positions, the
+ * difference is under one GUI pixel), and the thumb is drawn from the continuous formula.
  */
 public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryList.Row> {
     /** Card height; the row pitch adds the gap on top of this. */
@@ -36,10 +45,12 @@ public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryLis
     /** Horizontal padding inside a card. */
     public static final int CARD_PADDING = 12;
     private static final float CARD_RADIUS = 6.0f;
-    /** Per-frame ease of the actual scroll amount toward the wheel target. */
-    private static final double SCROLL_EASE = 0.45;
+    /** Time-normalised scroll glide speed (per second); 0.45/frame at 60fps equals ~36/s. */
+    private static final double SCROLL_SPEED = 36.0;
     /** Below this many pixels of remaining travel the animation just settles. */
     private static final double SCROLL_SETTLE = 0.5;
+    /** Frame gap cap so a stall never teleports the glide. */
+    private static final double MAX_FRAME_SECONDS = 0.1;
 
     private final int rowWidth;
 
@@ -49,6 +60,8 @@ public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryLis
     private double scrollEased;
     /** Set while the eased amount is being applied, so {@link #setScrollAmount} passes through. */
     private boolean applyingEasedScroll;
+    /** Timestamp of the last drawn frame, for the time-normalised ease. */
+    private long lastFrameMs = -1L;
 
     public ConfigEntryList(Minecraft mc, int width, int height, int y0, int rowWidth, List<Row> rows) {
         super(mc, width, height, y0, ROW_HEIGHT);
@@ -102,12 +115,20 @@ public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryLis
 
     /** Moves the eased scroll amount toward the wheel target and applies it to the list. */
     private void advanceSmoothScroll() {
+        // Track the frame gap on every frame so it is fresh when a wheel event arrives after
+        // a long idle period (a stale gap would teleport the glide on the first frame).
+        long now = Util.getMillis();
+        double dt = this.lastFrameMs < 0
+                ? 0.0
+                : Math.min((now - this.lastFrameMs) / 1000.0, MAX_FRAME_SECONDS);
+        this.lastFrameMs = now;
         if (this.scrollable()) {
             this.scrollTarget = Math.clamp(this.scrollTarget, 0.0, this.maxScrollAmount());
             if (Math.abs(this.scrollTarget - this.scrollEased) <= SCROLL_SETTLE) {
                 this.scrollEased = this.scrollTarget;
             } else {
-                this.scrollEased += (this.scrollTarget - this.scrollEased) * SCROLL_EASE;
+                this.scrollEased += (this.scrollTarget - this.scrollEased)
+                        * (1.0 - Math.exp(-dt * SCROLL_SPEED));
             }
         } else {
             this.scrollTarget = 0.0;
@@ -120,6 +141,21 @@ public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryLis
             // The super setter clamps; keep our state in sync with what actually applied.
             this.scrollEased = this.scrollTarget = this.scrollAmount();
         }
+    }
+
+    /**
+     * Draws each row shifted by the scroll fraction vanilla drops: rows sit at
+     * {@code firstEntryY - (int) scrollAmount}, so the true (fractional) position is
+     * {@code rowY - frac}. Without this the eased scroll moves content in whole-GUI-pixel
+     * stair-steps (3 screen px per GUI px at scale 3) instead of gliding smoothly.
+     */
+    @Override
+    protected void extractItem(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick, Row entry) {
+        double frac = this.scrollAmount() - Math.floor(this.scrollAmount());
+        gfx.pose().pushMatrix();
+        gfx.pose().translate(0.0f, (float) -frac);
+        super.extractItem(gfx, mouseX, mouseY, partialTick, entry);
+        gfx.pose().popMatrix();
     }
 
     @Override
@@ -137,13 +173,19 @@ public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryLis
         if (!this.scrollable()) {
             return;
         }
-        // Slim rounded scrollbar instead of the vanilla sprite one.
+        // Slim rounded scrollbar instead of the vanilla sprite one. The thumb is drawn from the
+        // continuous position instead of vanilla's scrollBarY(), which truncates the scroll
+        // amount to an int and integer-divides, so it stair-steps during the animation.
         float w = 4.0f;
         float x = this.scrollBarX() + (this.scrollbarWidth() - w) / 2.0f;
         boolean hovered = mouseX >= x - 3.0f && mouseX <= x + w + 3.0f
                 && mouseY >= this.getY() && mouseY <= this.getY() + this.getHeight();
-        Ui.pill(gfx, x, this.getY() + 2, w, this.getHeight() - 4, GuiUtil.CARD);
-        Ui.pill(gfx, x, this.scrollBarY(), w, this.scrollerHeight(),
+        float trackTop = this.getY() + 2.0f;
+        float trackH = this.getHeight() - 4.0f;
+        Ui.pill(gfx, x, trackTop, w, trackH, GuiUtil.CARD);
+        float span = trackH - this.scrollerHeight();
+        float thumbY = trackTop + (float) (this.scrollAmount() * span / this.maxScrollAmount());
+        Ui.pill(gfx, x, thumbY, w, this.scrollerHeight(),
                 hovered ? GuiUtil.SCROLLBAR_HOVER : GuiUtil.SCROLLBAR);
     }
 

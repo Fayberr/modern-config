@@ -5,20 +5,27 @@ import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Util;
 
 /**
  * Ranged slider filling a whole row card: label on the left, snapped value on the right, and a
  * thin capsule track below with the travelled part in the accent colour and a round knob.
  *
- * <p>All vanilla interaction is kept (mouse drag, arrow keys while focused); only the drawing is
- * replaced. The written value is ALWAYS snapped to {@code step}: while dragging, vanilla drives
- * the 0..1 {@code value} from the raw mouse position and {@link #applyValue()} writes the
- * snapped value through immediately (live preview). The knob, however, is decoupled from the
- * written value: it follows the raw drag position 1:1 (so the motion is smooth instead of
+ * <p>All vanilla interaction is kept (mouse drag, arrow keys while focused); the drawing and the
+ * mouse-to-value mapping are replaced. The written value is ALWAYS snapped to {@code step}: while
+ * dragging, the 0..1 {@code value} is driven from the raw mouse position and {@link #applyValue()}
+ * writes the snapped value through immediately (live preview). The knob, however, is decoupled
+ * from the written value: it follows the raw drag position 1:1 (so the motion is smooth instead of
  * hopping between steps), and glides the last bit onto the written step when the drag ends or
  * an arrow key steps, via the eased {@link #displayValue}. Arrow keys step exactly one
  * {@code step} (vanilla's own key handling moves by a screen-width-dependent fraction, which
  * would be wrong here), so the value still locks on the same reachable numbers as before.
+ *
+ * <p>The mouse mapping is replaced because vanilla assumes its own 8px handle: it maps the cursor
+ * onto a knob trajectory spanning {@code [x + 4, x + width - 4]}, while the drawn knob travels
+ * {@code [trackX + r, trackX + trackW - r]}. Left alone, clicks and drags land the knob up to
+ * ~13px off the cursor at the ends of the track. {@link #onClick} and {@link #onDrag} therefore
+ * map the cursor with the drawn geometry instead, so the knob sits exactly under it.
  */
 public abstract class StyledSlider extends AbstractSliderButton {
     /** Row height this slider is laid out for. */
@@ -29,8 +36,10 @@ public abstract class StyledSlider extends AbstractSliderButton {
     private static final int LABEL_Y = 6;
     private static final int TRACK_CENTER_Y = 25;
     private static final float SIDE_PADDING = 12.0f;
-    /** Per-frame ease of the drawn knob toward the logical value while not dragging. */
-    private static final float KNOB_EASE = 0.45f;
+    /** Time-normalised knob glide speed (per second); 0.45/frame at 60fps equals ~36/s. */
+    private static final double KNOB_SPEED = 36.0;
+    /** Frame gap cap so a stall never teleports the glide. */
+    private static final double MAX_FRAME_SECONDS = 0.1;
 
     protected final Component label;
     protected final double min;
@@ -41,6 +50,8 @@ public abstract class StyledSlider extends AbstractSliderButton {
     private double displayValue;
     /** True between mouse press and release: {@code value} is the raw mouse fraction then. */
     private boolean draggingKnob;
+    /** Timestamp of the last drawn frame, for the time-normalised glide. */
+    private long lastFrameMs = -1L;
 
     protected StyledSlider(int x, int y, int w, Component label, double min, double max, double step, double initial) {
         super(x, y, w, HEIGHT, Ui.ui(label), to01(min, max, initial));
@@ -67,9 +78,27 @@ public abstract class StyledSlider extends AbstractSliderButton {
     }
 
     @Override
+    public void onClick(MouseButtonEvent event, boolean doubleClick) {
+        // Do NOT call super: it maps the cursor onto vanilla's own 8px handle trajectory
+        // ((mouseX - getX() - 4) / (width - 8)), which disagrees with the drawn track and puts
+        // the knob up to ~13px off the cursor at the track ends. Map with the drawn geometry.
+        this.setValueFromCursor(event.x());
+    }
+
+    @Override
     protected void onDrag(MouseButtonEvent event, double deltaX, double deltaY) {
         this.draggingKnob = true;
-        super.onDrag(event, deltaX, deltaY);
+        this.setValueFromCursor(event.x());
+    }
+
+    /** Maps the cursor X onto the drawn knob trajectory so the knob sits exactly under it. */
+    private void setValueFromCursor(double mouseX) {
+        double trackX = this.getX() + SIDE_PADDING;
+        double travel = this.getWidth() - SIDE_PADDING * 2.0 - KNOB_RADIUS * 2.0;
+        if (travel <= 0.0) {
+            return;
+        }
+        this.setValue(Math.clamp((mouseX - trackX - KNOB_RADIUS) / travel, 0.0, 1.0));
     }
 
     @Override
@@ -103,10 +132,17 @@ public abstract class StyledSlider extends AbstractSliderButton {
     @Override
     public void extractWidgetRenderState(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
         // Raw 1:1 follow while dragging; glide onto the written step the rest of the time.
+        // The glide is time-normalised so the feel is identical at any frame rate; the frame
+        // gap is tracked on every frame so it is fresh when a drag ends.
+        long now = Util.getMillis();
+        double dt = this.lastFrameMs < 0
+                ? 0.0
+                : Math.min((now - this.lastFrameMs) / 1000.0, MAX_FRAME_SECONDS);
+        this.lastFrameMs = now;
         if (this.draggingKnob) {
             this.displayValue = this.value;
         } else {
-            this.displayValue += (this.value - this.displayValue) * KNOB_EASE;
+            this.displayValue += (this.value - this.displayValue) * (1.0 - Math.exp(-dt * KNOB_SPEED));
         }
 
         boolean hovered = this.isHoveredOrFocused();
