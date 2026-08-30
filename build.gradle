@@ -56,6 +56,8 @@ jar {
 publishing {
 	publications {
 		create('mavenJava', MavenPublication) {
+			// Publish under fayber-config (the archivesBaseName), not the project name.
+			artifactId = project.archives_base_name
 			from components.java
 		}
 	}
