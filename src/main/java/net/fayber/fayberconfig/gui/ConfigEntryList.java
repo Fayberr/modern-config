@@ -10,6 +10,7 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 
 import java.util.List;
 import java.util.Locale;
@@ -99,6 +100,63 @@ public class ConfigEntryList extends CardList {
             }
             int y = this.cardY() + CARD_HEIGHT - Ui.font().lineHeight - 4;
             Ui.text(gfx, this.title, this.getX() + 2, y, this.theme().textMuted);
+        }
+    }
+
+    /**
+     * Static wrapped paragraph (documentation text, Cloth's description entries): no card, no
+     * interaction, secondary text colour. The row grows with the wrapped line count, which works
+     * because 26.1's {@code AbstractSelectionList} walks {@code Entry.getHeight()} on every
+     * reposition (bytecode-verified; the same mechanism collapses hidden tab rows to 0). The wrap
+     * width follows the row width, so a note re-flows on resize and the scroll extent follows
+     * from the same {@code getHeight} call that performs the re-flow.
+     */
+    public static class NoteRow extends Row {
+        private static final int V_PADDING = 8;
+        private final Component text;
+        private int wrappedAt = -1;
+        private List<FormattedCharSequence> lines = List.of();
+
+        public NoteRow(Component text) {
+            this.text = text;
+        }
+
+        /** Re-wraps when the available width changed; cached otherwise. */
+        private void wrap() {
+            int width = Math.max(24, this.getWidth() - CARD_PADDING);
+            if (this.wrappedAt != width) {
+                this.wrappedAt = width;
+                this.lines = Ui.font().split(this.text, width);
+            }
+        }
+
+        @Override
+        public int getHeight() {
+            if (!this.isVisible()) {
+                return 0;
+            }
+            if (this.getWidth() > 0) {
+                this.wrap();
+            }
+            return 2 * V_PADDING + this.lines.size() * Ui.font().lineHeight;
+        }
+
+        @Override
+        protected List<? extends GuiEventListener> visibleChildren() {
+            return List.of();
+        }
+
+        @Override
+        public void extractContent(GuiGraphicsExtractor gfx, int mouseX, int mouseY, boolean hovered, float partialTick) {
+            if (!this.isVisible()) {
+                return;
+            }
+            this.wrap();
+            int y = this.cardY() + V_PADDING;
+            for (FormattedCharSequence line : this.lines) {
+                gfx.text(Ui.font(), line, this.getX() + 2, y, this.theme().textSecondary, false);
+                y += Ui.font().lineHeight;
+            }
         }
     }
 

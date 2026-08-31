@@ -12,6 +12,7 @@
 		"DropdownMenuBuilderAccessor",
 		"SelectionListEntryAccessor",
 		"MultiElementListEntryAccessor",
+		"TextListEntryAccessor",
 		"ClothScreenButtonMixin",
 		"GlobalizedClothScreenButtonMixin"
 	],

@@ -30,6 +30,7 @@ import net.fayber.faybergui.widget.FlatButton;
 import net.fayber.fayberconfig.api.FayberConfigScreen;
 import net.fayber.fayberconfig.bridge.mixin.MultiElementListEntryAccessor;
 import net.fayber.fayberconfig.bridge.mixin.SelectionListEntryAccessor;
+import net.fayber.fayberconfig.bridge.mixin.TextListEntryAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.components.AbstractWidget;
@@ -273,10 +274,17 @@ public final class ClothBridge {
             return null;
         }
 
-        // Static text: a label row with no value. Fayber has no text-only entry, so it becomes a
-        // header, which reads correctly for the section captions these are normally used for.
-        if (entry instanceof TextListEntry) {
-            builder.category(label);
+        // Static text: a paragraph with no value. Its field name is not a label at all - Cloth's
+        // startTextDescription mints a random UUID for every description (bytecode-verified; it
+        // is the only randomUUID in ConfigEntryBuilderImpl) and the real text sits in a private
+        // field, so the note is pulled out through an accessor mixin and rendered as wrapped
+        // secondary text. Entries with no text are skipped entirely rather than leaking a UUID
+        // header.
+        if (entry instanceof TextListEntry textEntry) {
+            Component text = ((TextListEntryAccessor) (Object) textEntry).fayberconfig$text();
+            if (text != null && !text.getString().isBlank()) {
+                builder.note(text.getString());
+            }
             return null;
         }
 

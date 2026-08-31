@@ -96,6 +96,43 @@ public interface ConfigEntry {
         }
     }
 
+    /** Static paragraph of documentation text; not an option and not interactive. */
+    final class Note implements ConfigEntry {
+        private final String text;
+
+        public Note(String text) {
+            this.text = text;
+        }
+
+        @Override
+        public Component label() {
+            return Component.literal(this.text);
+        }
+
+        @Override
+        public Component tooltip() {
+            return null;
+        }
+
+        @Override
+        public Note tooltip(String tooltip) {
+            return this; // notes have no tooltip
+        }
+
+        @Override
+        public void snapshot() {
+        }
+
+        @Override
+        public void restore() {
+        }
+
+        @Override
+        public ConfigEntryList.Row createRow() {
+            return new ConfigEntryList.NoteRow(this.label());
+        }
+    }
+
     /** Boolean pill toggle. */
     final class Bool implements ConfigEntry {
         private final Component label;

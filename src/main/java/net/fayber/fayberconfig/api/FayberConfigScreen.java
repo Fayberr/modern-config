@@ -292,6 +292,15 @@ public class FayberConfigScreen extends Screen {
         }
 
         /**
+         * Adds a static paragraph of documentation text (no value, not interactive). Rendered as
+         * wrapped secondary text between the cards; the row grows with the wrapped line count.
+         */
+        public Builder note(String text) {
+            this.addEntry(new ConfigEntry.Note(text));
+            return this;
+        }
+
+        /**
          * Attaches a tooltip to the most recently added entry. Kept as a separate builder step
          * so entry methods can return the Builder and chain fluently.
          */
