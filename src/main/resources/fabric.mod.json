@@ -23,6 +23,6 @@
 		"minecraft": ">=26.1 <26.2",
 		"java": ">=25",
 		"fabric-api": "*",
-		"faybergui": "=1.0.1"
+		"faybergui": "=1.0.2"
 	}
 }
