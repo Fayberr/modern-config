@@ -168,10 +168,12 @@ public class FayberConfigScreen extends Screen {
             } else {
                 // More tabs than the column fits (Cloth configs love seven categories): the bar
                 // gets its own clipped, wheel-scrollable strip whose scrollbar sits just under
-                // the underline.
+                // the underline. Picking a tab scrolls the strip minimally so the whole selected
+                // tab is in view (the far-right one would otherwise stay clipped).
                 HorizontalScrollPanel panel =
                         new HorizontalScrollPanel(this.columnX, tabsY, this.columnW, Tabs.HEIGHT + 6);
                 panel.add(tabs);
+                tabs.onChange(() -> panel.ensureVisible(tabs));
                 this.addRenderableWidget(panel);
             }
         }
