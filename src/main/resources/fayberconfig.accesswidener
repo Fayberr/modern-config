@@ -1,0 +1,5 @@
+accessWidener v2 official
+# The Cloth screen button mixins (bridge) need to register a widget on Cloth's screen.
+# addRenderableWidget is inherited from Screen, and a @Shadow cannot reach inherited members,
+# so it is widened instead and called through a plain Screen cast.
+accessible method net/minecraft/client/gui/screens/Screen addRenderableWidget (Lnet/minecraft/client/gui/components/events/GuiEventListener;)Lnet/minecraft/client/gui/components/events/GuiEventListener;

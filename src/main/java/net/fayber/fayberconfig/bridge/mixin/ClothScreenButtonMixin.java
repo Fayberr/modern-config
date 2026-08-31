@@ -2,10 +2,8 @@ package net.fayber.fayberconfig.bridge.mixin;
 
 import me.shedaniel.clothconfig2.gui.ClothConfigScreen;
 import net.fayber.fayberconfig.bridge.ClothBridge;
-import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -19,16 +17,17 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * whether-a-translation-exists check, lives in {@link ClothBridge#addFayberButton}. Re-running
  * {@code init()} on a window resize is safe: the screen clears its widgets first.
  *
- * <p>The shadow uses the erased signature of the generic {@code addRenderableWidget} (the type
- * parameter's first bound), so it matches the descriptor the mixin apply step looks for.
+ * <p>The widget goes in through {@code Screen.addRenderableWidget}, widened to accessible by
+ * {@code fayberconfig.accesswidener}: a {@code @Shadow} cannot reach a method the target class
+ * only inherits, which is exactly how the first attempt of this mixin failed to apply. The
+ * injection is {@code require = 0} on purpose: if a future Cloth version reshapes {@code init()},
+ * the cost is a missing button, not a broken config screen.
  */
 @Mixin(ClothConfigScreen.class)
 public abstract class ClothScreenButtonMixin {
-    @Shadow
-    protected abstract GuiEventListener addRenderableWidget(GuiEventListener widget);
-
-    @Inject(method = "init()V", at = @At("RETURN"))
+    @Inject(method = "init()V", at = @At("RETURN"), require = 0)
     private void fayberconfig$addFayberButton(CallbackInfo ci) {
-        ClothBridge.addFayberButton((Screen) (Object) this, this::addRenderableWidget);
+        Screen self = (Screen) (Object) this;
+        ClothBridge.addFayberButton(self, self::addRenderableWidget);
     }
 }

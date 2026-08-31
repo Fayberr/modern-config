@@ -18,6 +18,7 @@
 			"net.fayber.fayberconfig.FayberConfigClient"
 		]
 	},
+	"accessWidener": "fayberconfig.accesswidener",
 	"mixins": [
 		"fayberconfig.cloth.mixins.json"
 	],

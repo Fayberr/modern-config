@@ -43,6 +43,9 @@ dependencies {
 // window size and auto-opens the demo config screen (see tools/preview.sh, which grabs a frame
 // off an Xvfb display so the look can be iterated on headlessly).
 loom {
+	// Widens Screen.addRenderableWidget for the bridge's Cloth screen button mixins; without it a
+	// @Shadow of that inherited method cannot resolve (see fayberconfig.accesswidener).
+	accessWidenerPath = file('src/main/resources/fayberconfig.accesswidener')
 	runs {
 		client {
 			programArgs '--width', '1280', '--height', '720'
