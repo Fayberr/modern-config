@@ -101,6 +101,8 @@ public final class ClothBridge {
                                    Screen clothScreen) {
         try {
             if (!BridgePrefs.enabledFor(title.getString())) {
+                LOGGER.info("The Cloth bridge is disabled for '{}' by its prefs (showing Cloth's own screen)",
+                        title.getString());
                 return null;
             }
 
@@ -115,12 +117,14 @@ public final class ClothBridge {
                 }
             });
 
+            int entryCount = 0;
             boolean multipleCategories = categories.size() > 1;
             for (ConfigCategory category : categories) {
                 if (multipleCategories) {
                     builder.category(category.getCategoryKey().getString());
                 }
                 for (Object raw : category.getEntries()) {
+                    entryCount++;
                     if (!(raw instanceof AbstractConfigListEntry<?> entry)) {
                         return refused(title, "an entry is not a standard Cloth entry ("
                                 + raw.getClass().getName() + ")");
@@ -140,6 +144,8 @@ public final class ClothBridge {
             // The screen translated cleanly, so remember how it was built: Cloth's own screen gets
             // a "Use Fayber Config" button (see the screen mixins) that re-runs this translation.
             REQUESTS.put(clothScreen, new TranslationRequest(title, parent, List.copyOf(categories), savingRunnable));
+            LOGGER.info("Translated the Cloth config for '{}' ({} entries in {} categories)",
+                    title.getString(), entryCount, categories.size());
             return builder.build();
         } catch (Throwable t) {
             // Never let the bridge break somebody else's config screen.
