@@ -15,7 +15,12 @@ import me.shedaniel.clothconfig2.gui.entries.StringListEntry;
 import me.shedaniel.clothconfig2.gui.entries.SubCategoryListEntry;
 import me.shedaniel.clothconfig2.gui.entries.TextListEntry;
 import me.shedaniel.clothconfig2.gui.entries.TooltipListEntry;
+import net.fayber.faybergui.render.Theme;
+import net.fayber.faybergui.widget.FlatButton;
 import net.fayber.fayberconfig.api.FayberConfigScreen;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.slf4j.Logger;
@@ -50,6 +55,11 @@ import org.jetbrains.annotations.Nullable;
  * written. The captured Cloth screen is kept so "Use original menu" can show it.
  */
 public final class ClothBridge {
+    /** Validators for the unbounded numeric text fields: mark bad input, never block typing. */
+    private static final java.util.function.Predicate<String> INT_LIKE = s -> s.matches("-?\\d*");
+    private static final java.util.function.Predicate<String> NUMBER_LIKE =
+            s -> s.matches("-?\\d*(\\.\\d*)?([eE][-+]?\\d+)?");
+
     public static final Logger LOGGER = LoggerFactory.getLogger("FayberConfig/ClothBridge");
 
     /**
@@ -106,16 +116,76 @@ public final class ClothBridge {
             }
 
             if (BridgePrefs.showFallbackButton()) {
-                builder.button("Use original menu",
-                        () -> net.minecraft.client.Minecraft.getInstance().setScreen(clothScreen));
-                builder.tooltip("Open this mod's own Cloth Config screen instead.");
+                builder.cornerButton("Use original menu",
+                        () -> Minecraft.getInstance().setScreen(clothScreen));
             }
 
+            // The screen translated cleanly, so remember how it was built: Cloth's own screen gets
+            // a "Use Fayber Config" button (see the screen mixins) that re-runs this translation.
+            REQUESTS.put(clothScreen, new TranslationRequest(title, parent, List.copyOf(categories), savingRunnable));
             return builder.build();
         } catch (Throwable t) {
             // Never let the bridge break somebody else's config screen.
             LOGGER.warn("Cloth bridge failed for '{}', falling back to the original screen", title.getString(), t);
             return null;
+        }
+    }
+
+    /** How a successfully translated Cloth screen was built, for the reverse button. */
+    private record TranslationRequest(Component title, @Nullable Screen parent,
+                                      List<ConfigCategory> categories, @Nullable Runnable savingRunnable) {
+    }
+
+    /** Cloth screens with a working translation, kept only as long as the screen lives. */
+    private static final Map<Screen, TranslationRequest> REQUESTS =
+            java.util.Collections.synchronizedMap(new WeakHashMap<>());
+
+    /** True when this Cloth screen can be swapped for a Fayber one. */
+    public static boolean hasFayberFor(Screen clothScreen) {
+        return BridgePrefs.showFallbackButton() && REQUESTS.containsKey(clothScreen);
+    }
+
+    /** The Cloth screen mixins call this: rebuild the Fayber screen and show it. */
+    public static void openFayberFor(Screen clothScreen) {
+        TranslationRequest request;
+        synchronized (REQUESTS) {
+            request = REQUESTS.get(clothScreen);
+        }
+        if (request == null) {
+            return;
+        }
+        Screen fayber = translate(request.title(), request.parent(), request.categories(),
+                request.savingRunnable(), clothScreen);
+        if (fayber != null) {
+            Minecraft.getInstance().setScreen(fayber);
+        }
+    }
+
+    /**
+     * Adds the "Use Fayber Config" button to a live Cloth screen, bottom right corner. Called from
+     * {@code init()} via the screen mixins; a no-op unless this screen has a stored translation.
+     */
+    public static void addFayberButton(Screen clothScreen, Consumer<AbstractWidget> addWidget) {
+        if (!hasFayberFor(clothScreen)) {
+            return;
+        }
+        try {
+            Font font = Minecraft.getInstance().font;
+            int w = Math.max(60, font.width("Use Fayber Config") + 16);
+            int h = 18;
+            int x = clothScreen.width - w - 8;
+            int y = clothScreen.height - h - 5;
+            // Cloth's own Cancel/Save sit centred around height - 26; on a narrow window the corner
+            // would reach into them, so stack above that band instead.
+            if (x < clothScreen.width / 2 + 160) {
+                y = clothScreen.height - 26 - h - 2;
+            }
+            FlatButton button = new FlatButton(x, y, w, h, Component.literal("Use Fayber Config"),
+                    () -> openFayberFor(clothScreen), FlatButton.Style.GHOST);
+            button.theme(Theme.dark());
+            addWidget.accept(button);
+        } catch (Throwable t) {
+            LOGGER.debug("Could not add the Fayber button to a Cloth screen", t);
         }
     }
 
@@ -180,22 +250,23 @@ public final class ClothBridge {
             int min = intOf(plumbing.min(), Integer.MIN_VALUE);
             int max = intOf(plumbing.max(), Integer.MAX_VALUE);
             if (min == Integer.MIN_VALUE || max == Integer.MAX_VALUE) {
-                // Unbounded: a slider would be meaningless, so show it as a text field.
+                // Unbounded: a slider would be meaningless, so show it as a text field. Values are
+                // only staged while the text parses, so half-typed states never reach Save.
                 builder.text(label, () -> String.valueOf(current(staged, e, e.getValue())),
-                        v -> parseInt(v).ifPresent(i -> staged.put(e, i)), 12);
+                        v -> parseInt(v).ifPresent(i -> staged.put(e, i)), 12, INT_LIKE);
             } else {
                 builder.intSlider(label, () -> (Integer) current(staged, e, e.getValue()),
                         v -> staged.put(e, v), min, max, 1);
             }
         } else if (entry instanceof LongListEntry e) {
             builder.text(label, () -> String.valueOf(current(staged, e, e.getValue())),
-                    v -> parseLong(v).ifPresent(l -> staged.put(e, l)), 20);
+                    v -> parseLong(v).ifPresent(l -> staged.put(e, l)), 20, INT_LIKE);
         } else if (entry instanceof FloatListEntry e) {
             float min = floatOf(plumbing.min(), Float.NEGATIVE_INFINITY);
             float max = floatOf(plumbing.max(), Float.POSITIVE_INFINITY);
             if (Float.isInfinite(min) || Float.isInfinite(max)) {
                 builder.text(label, () -> String.valueOf(current(staged, e, e.getValue())),
-                        v -> parseFloat(v).ifPresent(f -> staged.put(e, f)), 16);
+                        v -> parseFloat(v).ifPresent(f -> staged.put(e, f)), 16, NUMBER_LIKE);
             } else {
                 builder.floatSlider(label, () -> (Float) current(staged, e, e.getValue()),
                         v -> staged.put(e, v), min, max, step(min, max));
@@ -205,7 +276,7 @@ public final class ClothBridge {
             double max = doubleOf(plumbing.max(), Double.POSITIVE_INFINITY);
             if (Double.isInfinite(min) || Double.isInfinite(max)) {
                 builder.text(label, () -> String.valueOf(current(staged, e, e.getValue())),
-                        v -> parseDouble(v).ifPresent(d -> staged.put(e, d)), 20);
+                        v -> parseDouble(v).ifPresent(d -> staged.put(e, d)), 20, NUMBER_LIKE);
             } else {
                 builder.doubleSlider(label, () -> (Double) current(staged, e, e.getValue()),
                         v -> staged.put(e, v), min, max, step(min, max));

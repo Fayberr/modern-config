@@ -5,14 +5,14 @@ import net.fayber.faybergui.render.Ui;
 import net.fayber.faybergui.widget.CycleButton;
 import net.fayber.faybergui.widget.FlatButton;
 import net.fayber.faybergui.widget.PillToggle;
+import net.fayber.faybergui.widget.TextField;
 import net.fayber.fayberconfig.gui.ConfigEntryList;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
 
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
@@ -28,8 +28,12 @@ import org.jetbrains.annotations.Nullable;
  * the entry handle for chaining {@code .tooltip(...)}.
  */
 public interface ConfigEntry {
-    /** The fayber-gui palette, shared by the raw EditBox in the Text entry. */
+    /** The fayber-gui palette, shared by every entry's widgets. */
     Theme THEME = Theme.dark();
+
+    /** Input field metrics, sized to sit inside a {@link ConfigEntryList#CARD_HEIGHT} card. */
+    int FIELD_HEIGHT = 22;
+    int FIELD_WIDTH = 132;
 
     Component label();
 
@@ -295,14 +299,23 @@ public interface ConfigEntry {
         private final Supplier<String> getter;
         private final Consumer<String> setter;
         private final int maxLength;
+        /** Marks non-conforming input with the error colour; null accepts anything. */
+        @Nullable
+        private final Predicate<String> validator;
         private Component tooltip;
         private String oldValue;
 
         public Text(String label, Supplier<String> getter, Consumer<String> setter, int maxLength) {
+            this(label, getter, setter, maxLength, null);
+        }
+
+        public Text(String label, Supplier<String> getter, Consumer<String> setter, int maxLength,
+                    @Nullable Predicate<String> validator) {
             this.label = Component.literal(label);
             this.getter = getter;
             this.setter = setter;
             this.maxLength = maxLength;
+            this.validator = validator;
         }
 
         public Text tooltip(String tooltip) {
@@ -332,15 +345,19 @@ public interface ConfigEntry {
 
         @Override
         public ConfigEntryList.Row createRow() {
-            // EditBox renders raw strings, not styled Components, so its text stays in the vanilla
-            // font; it is drawn borderless and right of the label so it reads as a value, not a box.
-            EditBox box = new EditBox(Minecraft.getInstance().font, 0, 0, 150, 20, this.label);
-            box.setMaxLength(this.maxLength);
-            box.setBordered(false);
-            box.setTextColor(THEME.text);
-            box.setValue(this.getter.get());
-            box.setResponder(this.setter::accept);
-            return new ConfigEntryList.WidgetRow(this.label, this.tooltip, box);
+            // Uses the toolkit's TextField, not a raw EditBox. A borderless EditBox draws its text
+            // at the widget's top-left corner (vanilla only centres it vertically when bordered and
+            // only insets it when bordered), so a raw 150px box right-aligned in the card left the
+            // value floating high and 150px shy of the right edge. TextField owns its own card.
+            TextField field = new TextField(0, 0, FIELD_WIDTH, FIELD_HEIGHT)
+                    .theme(THEME)
+                    .maxLength(this.maxLength)
+                    .value(this.getter.get())
+                    .onChanged(this.setter);
+            if (this.validator != null) {
+                field.validator(this.validator);
+            }
+            return new ConfigEntryList.WidgetRow(this.label, this.tooltip, field);
         }
     }
 

@@ -14,6 +14,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import org.jetbrains.annotations.Nullable;
@@ -58,6 +59,17 @@ public class FayberConfigScreen extends Screen {
     @Nullable
     private final Runnable onSave;
     private final List<ConfigEntry> entries;
+    /** Small secondary action pinned to the true bottom right corner, outside the card column. */
+    @Nullable
+    private final CornerButton cornerButton;
+
+    /**
+     * A pinned corner action: a small ghost button in the bottom right of the window, kept apart
+     * from the entry list so screens can offer an escape hatch (like the bridge's "Use original
+     * menu") without it scrolling away as a card row.
+     */
+    public record CornerButton(String label, Runnable action) {
+    }
 
     /** The fayber-gui palette; the default is the same neutral ramp 1.0.x drew with. */
     private final Theme theme = Theme.dark();
@@ -69,12 +81,14 @@ public class FayberConfigScreen extends Screen {
     private int columnW;
     private int titleY;
 
-    FayberConfigScreen(Component title, @Nullable Screen parent, @Nullable Runnable onSave, List<ConfigEntry> entries) {
+    FayberConfigScreen(Component title, @Nullable Screen parent, @Nullable Runnable onSave,
+                       List<ConfigEntry> entries, @Nullable CornerButton cornerButton) {
         // Kept raw: the Inter variant depends on the GUI scale, so it is applied at draw time.
         super(title);
         this.parent = parent;
         this.onSave = onSave;
         this.entries = entries;
+        this.cornerButton = cornerButton;
     }
 
     public static Builder builder(Component title, @Nullable Screen parent, @Nullable Runnable onSave) {
@@ -97,7 +111,11 @@ public class FayberConfigScreen extends Screen {
         this.titleY = compact ? 14 : TITLE_Y;
         int listTop = compact ? 32 : LIST_TOP;
         int buttonH = compact ? 24 : BUTTON_HEIGHT;
+        // A corner button owns a small strip at the true bottom right, so the footer lifts above it.
         int footerMargin = compact ? 8 : FOOTER_MARGIN;
+        if (this.cornerButton != null) {
+            footerMargin += compact ? 18 : 20;
+        }
         int buttonGap = compact ? 6 : 8;
 
         this.columnW = Math.min(CONTENT_WIDTH, Math.max(220, this.width - 32));
@@ -125,6 +143,17 @@ public class FayberConfigScreen extends Screen {
                 Component.literal("Cancel"), this::onClose, FlatButton.Style.GHOST));
         this.addRenderableWidget(new FlatButton(this.columnX + this.columnW - buttonW, buttonY, buttonW, buttonH,
                 Component.literal("Save"), this::saveAndClose, FlatButton.Style.PRIMARY));
+
+        if (this.cornerButton != null) {
+            int w = Math.max(60, this.minecraft.font.width(this.cornerButton.label()) + 16);
+            int h = compact ? 16 : 18;
+            int x = this.width - w - (compact ? 6 : 8);
+            int y = this.height - h - (compact ? 4 : 6);
+            FlatButton corner = new FlatButton(x, y, w, h, Component.literal(this.cornerButton.label()),
+                    this.cornerButton.action(), FlatButton.Style.GHOST);
+            corner.theme(this.theme);
+            this.addRenderableWidget(corner);
+        }
     }
 
     private void saveAndClose() {
@@ -172,6 +201,8 @@ public class FayberConfigScreen extends Screen {
         @Nullable
         private final Runnable onSave;
         private final List<ConfigEntry> entries = new ArrayList<>();
+        @Nullable
+        private CornerButton cornerButton;
 
         private Builder(Component title, @Nullable Screen parent, @Nullable Runnable onSave) {
             this.title = title;
@@ -221,6 +252,13 @@ public class FayberConfigScreen extends Screen {
             return this;
         }
 
+        /** Text field whose non-conforming input is marked invalid while typing. */
+        public Builder text(String label, Supplier<String> getter, Consumer<String> setter, int maxLength,
+                            Predicate<String> validator) {
+            this.entries.add(new ConfigEntry.Text(label, getter, setter, maxLength, validator));
+            return this;
+        }
+
         /**
          * An option with a fixed set of values, shown as a cycle card that steps through them on
          * click (left forward, right backward). Typical for enums; {@code namer} turns a value
@@ -237,8 +275,19 @@ public class FayberConfigScreen extends Screen {
             return this;
         }
 
+        /**
+         * A small secondary action pinned to the bottom right corner of the window, outside the
+         * card column and the Cancel/Save footer. Meant for escape hatches like the bridge's
+         * "Use original menu", not for config options.
+         */
+        public Builder cornerButton(String label, Runnable onPress) {
+            this.cornerButton = new CornerButton(label, onPress);
+            return this;
+        }
+
         public FayberConfigScreen build() {
-            return new FayberConfigScreen(this.title, this.parent, this.onSave, List.copyOf(this.entries));
+            return new FayberConfigScreen(this.title, this.parent, this.onSave,
+                    List.copyOf(this.entries), this.cornerButton);
         }
     }
 }
