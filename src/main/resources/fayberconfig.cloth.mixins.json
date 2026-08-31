@@ -11,6 +11,7 @@
 		"KeyCodeBuilderAccessor",
 		"DropdownMenuBuilderAccessor",
 		"SelectionListEntryAccessor",
+		"MultiElementListEntryAccessor",
 		"ClothScreenButtonMixin",
 		"GlobalizedClothScreenButtonMixin"
 	],

@@ -5,14 +5,20 @@ import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.gui.entries.BooleanListEntry;
 import me.shedaniel.clothconfig2.gui.entries.ColorEntry;
 import me.shedaniel.clothconfig2.gui.entries.DoubleListEntry;
+import me.shedaniel.clothconfig2.gui.entries.DoubleListListEntry;
 import me.shedaniel.clothconfig2.gui.entries.DropdownBoxEntry;
+import me.shedaniel.clothconfig2.gui.entries.EmptyEntry;
 import me.shedaniel.clothconfig2.gui.entries.EnumListEntry;
 import me.shedaniel.clothconfig2.gui.entries.FloatListEntry;
+import me.shedaniel.clothconfig2.gui.entries.FloatListListEntry;
 import me.shedaniel.clothconfig2.gui.entries.IntegerListEntry;
+import me.shedaniel.clothconfig2.gui.entries.IntegerListListEntry;
 import me.shedaniel.clothconfig2.gui.entries.IntegerSliderEntry;
 import me.shedaniel.clothconfig2.gui.entries.KeyCodeEntry;
 import me.shedaniel.clothconfig2.gui.entries.LongListEntry;
+import me.shedaniel.clothconfig2.gui.entries.LongListListEntry;
 import me.shedaniel.clothconfig2.gui.entries.LongSliderEntry;
+import me.shedaniel.clothconfig2.gui.entries.MultiElementListEntry;
 import me.shedaniel.clothconfig2.gui.entries.SelectionListEntry;
 import me.shedaniel.clothconfig2.gui.entries.StringListEntry;
 import me.shedaniel.clothconfig2.gui.entries.StringListListEntry;
@@ -22,6 +28,7 @@ import me.shedaniel.clothconfig2.gui.entries.TooltipListEntry;
 import net.fayber.faybergui.render.Theme;
 import net.fayber.faybergui.widget.FlatButton;
 import net.fayber.fayberconfig.api.FayberConfigScreen;
+import net.fayber.fayberconfig.bridge.mixin.MultiElementListEntryAccessor;
 import net.fayber.fayberconfig.bridge.mixin.SelectionListEntryAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -249,10 +256,29 @@ public final class ClothBridge {
             return null;
         }
 
+        // An expandable group: same flat treatment as a sub category. Groups are built directly
+        // rather than through a builder, so their child list lives in a private field reached
+        // through the accessor mixin.
+        if (entry instanceof MultiElementListEntry<?> group) {
+            builder.category(label);
+            for (AbstractConfigListEntry<?> child : ((MultiElementListEntryAccessor) (Object) group).fayberconfig$entries()) {
+                String reason = addEntry(builder, child, staged, onSave, "");
+                if (reason != null) {
+                    return reason;
+                }
+            }
+            return null;
+        }
+
         // Static text: a label row with no value. Fayber has no text-only entry, so it becomes a
         // header, which reads correctly for the section captions these are normally used for.
         if (entry instanceof TextListEntry) {
             builder.category(label);
+            return null;
+        }
+
+        // A pure spacer row: nothing to show, nothing to save, so nothing is added.
+        if (entry instanceof EmptyEntry) {
             return null;
         }
 
@@ -301,14 +327,17 @@ public final class ClothBridge {
             builder.intSlider(label, () -> (Integer) current(staged, e, e.getValue()),
                     v -> staged.put(e, v), min, max, 1);
         } else if (entry instanceof LongSliderEntry e) {
-            // Fayber has no long slider; a long range that exceeds int cannot be shown faithfully.
             long min = longOf(plumbing.min(), 0L);
             long max = longOf(plumbing.max(), 100L);
-            if (min < Integer.MIN_VALUE || max > Integer.MAX_VALUE) {
-                return "'" + label + "' is a long slider whose range does not fit an int";
+            if (min >= Integer.MIN_VALUE && max <= Integer.MAX_VALUE) {
+                builder.intSlider(label, () -> ((Number) current(staged, e, e.getValue())).intValue(),
+                        v -> staged.put(e, (long) v), (int) min, (int) max, 1);
+            } else {
+                // Fayber has no long slider; a range beyond int becomes a text field, which still
+                // shows and saves the exact value instead of refusing the whole screen.
+                builder.text(label, () -> String.valueOf(current(staged, e, e.getValue())),
+                        v -> parseLong(v).ifPresent(l -> staged.put(e, l)), 20, INT_LIKE);
             }
-            builder.intSlider(label, () -> ((Number) current(staged, e, e.getValue())).intValue(),
-                    v -> staged.put(e, (long) v), (int) min, (int) max, 1);
         } else if (entry instanceof IntegerListEntry e) {
             int min = intOf(plumbing.min(), Integer.MIN_VALUE);
             int max = intOf(plumbing.max(), Integer.MAX_VALUE);
@@ -355,6 +384,14 @@ public final class ClothBridge {
             builder.stringList(label,
                     () -> stringListOf(staged, e, value),
                     v -> staged.put(e, v));
+        } else if (entry instanceof IntegerListListEntry e) {
+            addLinesList(builder, label, e, staged, ClothBridge::boxedInt);
+        } else if (entry instanceof LongListListEntry e) {
+            addLinesList(builder, label, e, staged, ClothBridge::boxedLong);
+        } else if (entry instanceof FloatListListEntry e) {
+            addLinesList(builder, label, e, staged, ClothBridge::parseFloat);
+        } else if (entry instanceof DoubleListListEntry e) {
+            addLinesList(builder, label, e, staged, ClothBridge::parseDouble);
         } else if (entry instanceof EnumListEntry<?> e) {
             // Only EnumListEntry, not its SelectionListEntry parent: Cloth fills an enum entry with
             // every constant of the type, but a plain SelectionListEntry may hold an arbitrary
@@ -386,8 +423,10 @@ public final class ClothBridge {
             }
             addCycle(builder, label, e, selections.toArray(), staged);
         } else {
-            // The remaining *ListListEntry number-list editors and anything a future Cloth
-            // version adds: not translated, so the whole screen stays Cloth's (logged above).
+            // Any kind not understood above (a third-party AbstractConfigListEntry subclass, or
+            // a kind from a future Cloth version): not translated, so the whole screen stays
+            // Cloth's (logged above). NestedListListEntry also lands here via the plumbing check:
+            // no Cloth builder constructs it, so no save consumer is ever captured for it.
             return "'" + label + "' is a " + entry.getClass().getSimpleName() + ", which is not supported";
         }
 
@@ -416,10 +455,42 @@ public final class ClothBridge {
         return value instanceof me.shedaniel.clothconfig2.api.ModifierKeyCode bind ? bind : fallback;
     }
 
-    /** The staged string list or Cloth's own. */
-    private static List<String> stringListOf(Map<Object, Object> staged, Object entry, List<String> fallback) {
+    /**
+     * The staged list or Cloth's own, as one line per item. Works for string lists and boxed
+     * number lists alike, which the raw staged values (erased to List) would not distinguish.
+     */
+    private static List<String> stringListOf(Map<Object, Object> staged, Object entry, @Nullable Object fallback) {
         Object value = staged.get(entry);
-        return value instanceof List<?> list ? (List<String>) list : fallback;
+        List<?> list = value instanceof List<?> stagedList ? stagedList
+                : fallback instanceof List<?> fallbackList ? fallbackList : List.of();
+        List<String> lines = new ArrayList<>(list.size());
+        for (Object element : list) {
+            lines.add(String.valueOf(element));
+        }
+        return lines;
+    }
+
+    /**
+     * Renders any entry whose value is a list of parseable items as a one-item-per-line text
+     * area. Edits are staged only when every line parses (all or nothing, like Cloth's own
+     * editors: a half-typed line never reaches Save).
+     */
+    private static void addLinesList(FayberConfigScreen.Builder builder, String label,
+                                     AbstractConfigListEntry<?> entry, Map<Object, Object> staged,
+                                     java.util.function.Function<String, java.util.Optional<?>> parse) {
+        builder.stringList(label,
+                () -> stringListOf(staged, entry, entry.getValue()),
+                value -> {
+                    List<Object> parsed = new ArrayList<>(value.size());
+                    for (String line : value) {
+                        java.util.Optional<?> element = parse.apply(line);
+                        if (element.isEmpty()) {
+                            return;
+                        }
+                        parsed.add(element.get());
+                    }
+                    staged.put(entry, parsed);
+                });
     }
 
     /** Cloth bind to toolkit code: GLFW keycodes as-is, mouse buttons at 1000 + button. */
@@ -607,6 +678,17 @@ public final class ClothBridge {
         } catch (NumberFormatException e) {
             return java.util.OptionalLong.empty();
         }
+    }
+
+    /** Same parses, boxed: the staged lists must carry the element type the erased consumers expect. */
+    private static java.util.Optional<?> boxedInt(String text) {
+        java.util.OptionalInt parsed = parseInt(text);
+        return parsed.isPresent() ? java.util.Optional.of(parsed.getAsInt()) : java.util.Optional.empty();
+    }
+
+    private static java.util.Optional<?> boxedLong(String text) {
+        java.util.OptionalLong parsed = parseLong(text);
+        return parsed.isPresent() ? java.util.Optional.of(parsed.getAsLong()) : java.util.Optional.empty();
     }
 
     private static java.util.Optional<Float> parseFloat(String text) {
