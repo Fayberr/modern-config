@@ -22,6 +22,7 @@
 		"fabricloader": ">=${loader_version}",
 		"minecraft": ">=26.1 <26.2",
 		"java": ">=25",
-		"fabric-api": "*"
+		"fabric-api": "*",
+		"faybergui": "=1.0.0"
 	}
 }

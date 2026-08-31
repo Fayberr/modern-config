@@ -12,7 +12,9 @@ base {
 
 repositories {
 	// No third-party mod dependencies: the library is vanilla + fabric-api only.
-	// Consumers (e.g. Waypoints) pull this jar from mavenLocal via `publishToMavenLocal`.
+	// The embedded fayber-gui toolkit comes from mavenLocal (publish it with
+	// `publishToMavenLocal` from the Fayber GUI project first).
+	mavenLocal()
 }
 
 dependencies {
@@ -21,6 +23,12 @@ dependencies {
 
 	// Fabric API.
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	// The GUI toolkit (widgets, Theme, CardList, Ui). Published to mavenLocal by the Fayber GUI
+	// project; `include` nests the jar inside this one (jar-in-jar) so consumers only install
+	// fayber-config. 26.1 is obfuscation-free, so no remapping is involved.
+	implementation "net.fayber:fayber-gui:${project.fayber_gui_version}"
+	include "net.fayber:fayber-gui:${project.fayber_gui_version}"
 }
 
 // Dev-only design workbench: `./gradlew runClient -PfcPreview=true` boots the client at a fixed

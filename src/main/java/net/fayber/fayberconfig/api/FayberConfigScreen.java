@@ -1,9 +1,9 @@
 package net.fayber.fayberconfig.api;
 
+import net.fayber.faybergui.render.Theme;
+import net.fayber.faybergui.render.Ui;
+import net.fayber.faybergui.widget.FlatButton;
 import net.fayber.fayberconfig.gui.ConfigEntryList;
-import net.fayber.fayberconfig.gui.FlatButton;
-import net.fayber.fayberconfig.gui.GuiUtil;
-import net.fayber.fayberconfig.gui.Ui;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -58,6 +58,9 @@ public class FayberConfigScreen extends Screen {
     @Nullable
     private final Runnable onSave;
     private final List<ConfigEntry> entries;
+
+    /** The fayber-gui palette; the default is the same neutral ramp 1.0.x drew with. */
+    private final Theme theme = Theme.dark();
 
     private ConfigEntryList list;
     private boolean closed = false;
@@ -148,9 +151,9 @@ public class FayberConfigScreen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
         // Backdrop and title must be extracted BEFORE super (which extracts the widgets), because
         // within one stratum extraction order is draw order.
-        gfx.fill(0, 0, this.width, this.height, GuiUtil.SCRIM);
+        gfx.fill(0, 0, this.width, this.height, this.theme.scrim);
 
-        Ui.text(gfx, Ui.uiBold(this.title), this.columnX, this.titleY, GuiUtil.TEXT);
+        Ui.text(gfx, Ui.uiBold(this.title), this.columnX, this.titleY, this.theme.text);
 
         super.extractRenderState(gfx, mouseX, mouseY, partialTick);
     }

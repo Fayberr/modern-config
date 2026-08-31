@@ -1,13 +1,11 @@
 package net.fayber.fayberconfig.api;
 
+import net.fayber.faybergui.render.Theme;
+import net.fayber.faybergui.render.Ui;
+import net.fayber.faybergui.widget.CycleButton;
+import net.fayber.faybergui.widget.FlatButton;
+import net.fayber.faybergui.widget.PillToggle;
 import net.fayber.fayberconfig.gui.ConfigEntryList;
-import net.fayber.fayberconfig.gui.CycleButtonWidget;
-import net.fayber.fayberconfig.gui.DoubleSliderWidget;
-import net.fayber.fayberconfig.gui.FlatButton;
-import net.fayber.fayberconfig.gui.FloatSliderWidget;
-import net.fayber.fayberconfig.gui.GuiUtil;
-import net.fayber.fayberconfig.gui.IntSliderWidget;
-import net.fayber.fayberconfig.gui.PillToggleWidget;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
@@ -30,6 +28,9 @@ import org.jetbrains.annotations.Nullable;
  * the entry handle for chaining {@code .tooltip(...)}.
  */
 public interface ConfigEntry {
+    /** The fayber-gui palette, shared by the raw EditBox in the Text entry. */
+    Theme THEME = Theme.dark();
+
     Component label();
 
     @Nullable
@@ -128,7 +129,7 @@ public interface ConfigEntry {
         @Override
         public ConfigEntryList.Row createRow() {
             return new ConfigEntryList.WidgetRow(this.label, this.tooltip,
-                    new PillToggleWidget(0, 0, this.getter, this.setter));
+                    new PillToggle(0, 0, this.getter, this.setter));
         }
     }
 
@@ -179,7 +180,7 @@ public interface ConfigEntry {
 
         @Override
         public ConfigEntryList.Row createRow() {
-            return new ConfigEntryList.SliderRow(new IntSliderWidget(0, 0, 100,
+            return new ConfigEntryList.SliderRow(new net.fayber.faybergui.widget.IntSlider(0, 0, 100,
                     this.label, this.min, this.max, this.step, this.getter, this.setter));
         }
     }
@@ -231,7 +232,7 @@ public interface ConfigEntry {
 
         @Override
         public ConfigEntryList.Row createRow() {
-            return new ConfigEntryList.SliderRow(new FloatSliderWidget(0, 0, 100,
+            return new ConfigEntryList.SliderRow(new net.fayber.faybergui.widget.FloatSlider(0, 0, 100,
                     this.label, this.min, this.max, this.step, this.getter, this.setter));
         }
     }
@@ -283,7 +284,7 @@ public interface ConfigEntry {
 
         @Override
         public ConfigEntryList.Row createRow() {
-            return new ConfigEntryList.SliderRow(new DoubleSliderWidget(0, 0, 100,
+            return new ConfigEntryList.SliderRow(new net.fayber.faybergui.widget.DoubleSlider(0, 0, 100,
                     this.label, this.min, this.max, this.step, this.getter, this.setter));
         }
     }
@@ -336,7 +337,7 @@ public interface ConfigEntry {
             EditBox box = new EditBox(Minecraft.getInstance().font, 0, 0, 150, 20, this.label);
             box.setMaxLength(this.maxLength);
             box.setBordered(false);
-            box.setTextColor(GuiUtil.TEXT);
+            box.setTextColor(THEME.text);
             box.setValue(this.getter.get());
             box.setResponder(this.setter::accept);
             return new ConfigEntryList.WidgetRow(this.label, this.tooltip, box);
@@ -390,7 +391,7 @@ public interface ConfigEntry {
         @Override
         public ConfigEntryList.Row createRow() {
             return new ConfigEntryList.WidgetRow(this.label, this.tooltip,
-                    new CycleButtonWidget<>(0, 0, 20, this.getter, this.setter, this.values, this.namer));
+                    new CycleButton<>(0, 0, 20, this.getter, this.setter, this.values, this.namer));
         }
     }
 
