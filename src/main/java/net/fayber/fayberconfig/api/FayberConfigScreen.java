@@ -18,8 +18,10 @@ import java.util.function.Supplier;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A Fayber Config screen: a centred dark panel with a title bar, a scrolling column of option
- * cards, and a Cancel/Save footer.
+ * A Fayber Config screen: a dimmed backdrop with a centred column of option cards floating
+ * directly on it (no panel box), a bold title on top and a Cancel/Save footer of separate card
+ * buttons. The same language as the waypoint screens, so mods using the library look like one
+ * product.
  *
  * <p>Values write through the entries' setters immediately (live preview: sliders and toggles
  * visibly change the game while the screen is open). When the screen opens, every entry snapshots
@@ -30,24 +32,25 @@ import org.jetbrains.annotations.Nullable;
  * attaches to the entry added just before it.
  *
  * <p>Layout is done by hand rather than with {@code HeaderAndFooterLayout} because everything has
- * to line up inside the panel, not the window: the list is positioned explicitly with
- * {@code updateSizeAndPosition(width, height, x, y)}, and the card width leaves a gutter on the
- * right wide enough for the scrollbar ({@code scrollBarX() == getRowRight() + scrollbarWidth() + 2}).
+ * to line up with the centred column, not the window: the list is positioned explicitly with
+ * {@code updateSizeAndPosition(width, height, x, y)}, and the list is wider than the cards so the
+ * scrollbar sits in a gutter outside the visible column
+ * ({@code scrollBarX() == getRowRight() + scrollbarWidth() + 2}).
  */
 public class FayberConfigScreen extends Screen {
-    /** Panel width in GUI pixels, clamped to the window. */
-    private static final int PANEL_WIDTH = 420;
-    /** Space above and below the panel. */
-    private static final int PANEL_MARGIN_Y = 24;
-    /** Title bar height inside the panel. */
-    private static final int HEADER_HEIGHT = 46;
-    /** Button bar height inside the panel. */
-    private static final int FOOTER_HEIGHT = 50;
-    /** Panel edge to card edge. */
-    private static final int CONTENT_INSET = 18;
-    /** Room to the right of the cards for the scrollbar. */
+    /** Width of the card column in GUI pixels, clamped to the window. */
+    private static final int CONTENT_WIDTH = 380;
+    /** Title baseline from the top of the screen. */
+    private static final int TITLE_Y = 18;
+    /** Top of the scrolling card column. */
+    private static final int LIST_TOP = 40;
+    /** Footer button height, and the margin below the buttons. */
+    private static final int BUTTON_HEIGHT = 28;
+    private static final int FOOTER_MARGIN = 14;
+    /** Below this window height (GUI pixels) the roomy metrics do not fit and compact ones kick in. */
+    private static final int COMPACT_BELOW = 300;
+    /** Room to each side of the cards for the scrollbar. */
     private static final int SCROLL_GUTTER = 14;
-    private static final float PANEL_RADIUS = 10.0f;
 
     @Nullable
     private final Screen parent;
@@ -58,10 +61,9 @@ public class FayberConfigScreen extends Screen {
     private ConfigEntryList list;
     private boolean closed = false;
 
-    private int panelX;
-    private int panelY;
-    private int panelW;
-    private int panelH;
+    private int columnX;
+    private int columnW;
+    private int titleY;
 
     FayberConfigScreen(Component title, @Nullable Screen parent, @Nullable Runnable onSave, List<ConfigEntry> entries) {
         // Kept raw: the Inter variant depends on the GUI scale, so it is applied at draw time.
@@ -86,35 +88,38 @@ public class FayberConfigScreen extends Screen {
             entry.snapshot();
         }
 
-        this.panelW = Math.min(PANEL_WIDTH, Math.max(200, this.width - 2 * PANEL_MARGIN_Y));
-        this.panelH = Math.max(140, this.height - 2 * PANEL_MARGIN_Y);
-        this.panelX = (this.width - this.panelW) / 2;
-        this.panelY = (this.height - this.panelH) / 2;
+        // 720p at GUI scale 3 is only 240 GUI pixels tall: tighter footer, closer list.
+        boolean compact = this.height < COMPACT_BELOW;
+        this.titleY = compact ? 14 : TITLE_Y;
+        int listTop = compact ? 32 : LIST_TOP;
+        int buttonH = compact ? 24 : BUTTON_HEIGHT;
+        int footerMargin = compact ? 8 : FOOTER_MARGIN;
+        int buttonGap = compact ? 6 : 8;
+
+        this.columnW = Math.min(CONTENT_WIDTH, Math.max(220, this.width - 32));
+        this.columnX = (this.width - this.columnW) / 2;
 
         List<ConfigEntryList.Row> rows = new ArrayList<>();
         for (ConfigEntry entry : this.entries) {
             rows.add(entry.createRow());
         }
 
-        // The list spans the panel interior; the cards are narrower so the scrollbar has a gutter.
-        int listX = this.panelX + CONTENT_INSET - SCROLL_GUTTER;
-        int listW = this.panelW - 2 * (CONTENT_INSET - SCROLL_GUTTER);
-        int listY = this.panelY + HEADER_HEIGHT;
-        int listH = this.panelH - HEADER_HEIGHT - FOOTER_HEIGHT;
-        int cardWidth = listW - 2 * SCROLL_GUTTER;
+        int buttonY = this.height - buttonH - footerMargin;
+        int listH = Math.max(ConfigEntryList.ROW_HEIGHT, buttonY - 12 - listTop);
 
-        this.list = new ConfigEntryList(this.minecraft, listW, listH, listY, cardWidth, rows);
-        this.list.updateSizeAndPosition(listW, listH, listX, listY);
+        // The list is wider than the visible card column: the cards are centred in it and the
+        // scrollbar lives in the gutter outside the column.
+        int listX = this.columnX - SCROLL_GUTTER;
+        int listW = this.columnW + 2 * SCROLL_GUTTER;
+
+        this.list = new ConfigEntryList(this.minecraft, listW, listH, listTop, this.columnW, rows);
+        this.list.updateSizeAndPosition(listW, listH, listX, listTop);
         this.addRenderableWidget(this.list);
 
-        int buttonW = 92;
-        int buttonH = 24;
-        int buttonY = this.panelY + this.panelH - FOOTER_HEIGHT + (FOOTER_HEIGHT - buttonH) / 2;
-        int saveX = this.panelX + this.panelW - CONTENT_INSET - buttonW;
-        int cancelX = saveX - 8 - buttonW;
-        this.addRenderableWidget(new FlatButton(cancelX, buttonY, buttonW, buttonH,
+        int buttonW = (this.columnW - buttonGap) / 2;
+        this.addRenderableWidget(new FlatButton(this.columnX, buttonY, buttonW, buttonH,
                 Component.literal("Cancel"), this::onClose, FlatButton.Style.GHOST));
-        this.addRenderableWidget(new FlatButton(saveX, buttonY, buttonW, buttonH,
+        this.addRenderableWidget(new FlatButton(this.columnX + this.columnW - buttonW, buttonY, buttonW, buttonH,
                 Component.literal("Save"), this::saveAndClose, FlatButton.Style.PRIMARY));
     }
 
@@ -140,21 +145,11 @@ public class FayberConfigScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
-        // Panel chrome must be extracted BEFORE super (which extracts the widgets), because within
-        // one stratum extraction order is draw order.
+        // Backdrop and title must be extracted BEFORE super (which extracts the widgets), because
+        // within one stratum extraction order is draw order.
         gfx.fill(0, 0, this.width, this.height, GuiUtil.SCRIM);
 
-        Ui.shadow(gfx, this.panelX, this.panelY, this.panelW, this.panelH, PANEL_RADIUS, 6.0f, 4);
-        Ui.roundRectBorder(gfx, this.panelX, this.panelY, this.panelW, this.panelH, PANEL_RADIUS,
-                GuiUtil.PANEL, GuiUtil.PANEL_BORDER, 1.0f);
-
-        Ui.text(gfx, Ui.uiBold(this.title), this.panelX + CONTENT_INSET,
-                this.panelY + (HEADER_HEIGHT - Ui.font().lineHeight) / 2, GuiUtil.TEXT);
-
-        // Hairlines separating the title bar and the button bar from the scrolling body.
-        Ui.rect(gfx, this.panelX + 1, this.panelY + HEADER_HEIGHT, this.panelW - 2, 0.5f, GuiUtil.PANEL_BORDER);
-        Ui.rect(gfx, this.panelX + 1, this.panelY + this.panelH - FOOTER_HEIGHT, this.panelW - 2, 0.5f,
-                GuiUtil.PANEL_BORDER);
+        Ui.text(gfx, Ui.uiBold(this.title), this.columnX, this.titleY, GuiUtil.TEXT);
 
         super.extractRenderState(gfx, mouseX, mouseY, partialTick);
     }

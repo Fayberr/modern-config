@@ -7,7 +7,7 @@ import net.minecraft.client.input.InputWithModifiers;
 import net.minecraft.network.chat.Component;
 
 /**
- * Flat rounded button in two weights: {@link Style#PRIMARY} (accent fill, dark label, for the
+ * Flat rounded button in two weights: {@link Style#PRIMARY} (near-white fill, dark label, for the
  * confirming action) and {@link Style#GHOST} (dark card, light label, for everything else).
  *
  * <p>{@link AbstractButton#extractWidgetRenderState} is final but only dispatches to

@@ -9,7 +9,7 @@ import net.minecraft.util.Util;
 
 /**
  * Ranged slider filling a whole row card: label on the left, snapped value on the right, and a
- * thin capsule track below with the travelled part in the accent colour and a round knob.
+ * thin capsule track below with the travelled part in mid grey and a white round knob.
  *
  * <p>All vanilla interaction is kept (mouse drag, arrow keys while focused); the drawing and the
  * mouse-to-value mapping are replaced. The written value is ALWAYS snapped to {@code step}: while
@@ -151,7 +151,7 @@ public abstract class StyledSlider extends AbstractSliderButton {
         Ui.text(gfx, this.label, this.getX() + (int) SIDE_PADDING, this.getY() + LABEL_Y, GuiUtil.TEXT);
         Ui.textRight(gfx, Ui.ui(this.format(this.snappedValue())),
                 this.getX() + this.getWidth() - (int) SIDE_PADDING, this.getY() + LABEL_Y,
-                hovered ? GuiUtil.ACCENT : GuiUtil.TEXT_SECONDARY);
+                hovered ? GuiUtil.TEXT : GuiUtil.TEXT_SECONDARY);
 
         // Capsule track: neutral remainder, accent up to the knob.
         float centerY = this.getY() + TRACK_CENTER_Y;
@@ -164,12 +164,10 @@ public abstract class StyledSlider extends AbstractSliderButton {
         float travel = trackW - KNOB_RADIUS * 2.0f;
         float knobCx = trackX + KNOB_RADIUS + (float) this.displayValue * travel;
         if (knobCx > trackX + KNOB_RADIUS) {
-            Ui.pill(gfx, trackX, trackY, knobCx - trackX, TRACK_THICKNESS, GuiUtil.ACCENT);
+            Ui.pill(gfx, trackX, trackY, knobCx - trackX, TRACK_THICKNESS,
+                    hovered ? GuiUtil.SLIDER_FILL_HOVER : GuiUtil.SLIDER_FILL);
         }
-        Ui.circle(gfx, knobCx, centerY, KNOB_RADIUS, hovered ? GuiUtil.TEXT : GuiUtil.ACCENT);
-        if (hovered) {
-            Ui.circle(gfx, knobCx, centerY, KNOB_RADIUS - 2.0f, GuiUtil.ACCENT);
-        }
+        Ui.circle(gfx, knobCx, centerY, KNOB_RADIUS, 0xFFFFFFFF);
     }
 
     protected abstract String format(double value);

@@ -23,15 +23,16 @@ import java.util.Locale;
  * KeyBindsList pattern: {@code extractContent} repositions children from the row's content coords
  * (scroll/resize-safe) and then calls their final {@code extractRenderState}.
  *
- * <p>Mouse-wheel scrolling is animated (vanilla's is instant): the wheel only moves a target,
- * and every frame the actual scroll amount eases toward it with a time-normalised factor, so the
- * glide feels identical at any frame rate. Authoritative scroll changes that are not wheel-driven
- * (scrollbar drag, keyboard, scrollToEntry) bypass the animation and stay instant, so dragging the
- * thumb keeps up with the pointer 1:1.
+ * <p>Mouse-wheel scrolling has momentum (vanilla's is instant): the wheel adds velocity, and the
+ * scroll position coasts with an exponential decay, the way a website eases a wheel step to rest.
+ * One notch travels {@code scrollRate()} pixels in total, but spread over a fraction of a second
+ * of deceleration instead of snapping there; fast spins accumulate velocity (capped). The decay
+ * is time-normalised, so the feel is identical at any frame rate. Authoritative scroll changes
+ * that are not wheel-driven (scrollbar drag, keyboard, code) cancel the glide and stay instant.
  *
  * <p>Vanilla positions rows at {@code firstEntryY - (int) scrollAmount} and the scrollbar thumb
  * from an integer-division formula: both drop the fractional part of the scroll amount, which
- * makes any fractional scroll (this animation, or a trackpad) move content in whole-GUI-pixel
+ * makes any fractional scroll (this glide, or a trackpad) move content in whole-GUI-pixel
  * stair-steps. Rows are therefore drawn through {@link #extractItem} with the pose shifted back
  * by the dropped fraction (true sub-pixel motion; hit-testing keeps the int positions, the
  * difference is under one GUI pixel), and the thumb is drawn from the continuous formula.
@@ -45,23 +46,20 @@ public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryLis
     /** Horizontal padding inside a card. */
     public static final int CARD_PADDING = 12;
     private static final float CARD_RADIUS = 6.0f;
-    /** Time-normalised scroll glide speed (per second). Slow enough that successive wheel
-     * notches blend into one continuous motion instead of stop-and-go steps. */
-    private static final double SCROLL_SPEED = 20.0;
-    /** Below this many pixels of remaining travel the animation just settles. */
-    private static final double SCROLL_SETTLE = 0.5;
+    /** Exponential velocity decay of the wheel glide (per second); a notch coasts ~0.4s. */
+    private static final double SCROLL_FRICTION = 10.0;
+    /** Glide speed below which the coast has visibly ended and stops. */
+    private static final double SCROLL_STOP = 6.0;
+    /** Velocity cap so a fast spin does not launch the list off-screen. */
+    private static final double SCROLL_MAX_SPEED = 4000.0;
     /** Frame gap cap so a stall never teleports the glide. */
     private static final double MAX_FRAME_SECONDS = 0.1;
 
     private final int rowWidth;
 
-    /** Where the wheel wants the scroll to be; the actual amount eases toward this. */
-    private double scrollTarget;
-    /** The scroll amount last applied; eased toward {@link #scrollTarget} once per frame. */
-    private double scrollEased;
-    /** Set while the eased amount is being applied, so {@link #setScrollAmount} passes through. */
-    private boolean applyingEasedScroll;
-    /** Timestamp of the last drawn frame, for the time-normalised ease. */
+    /** Current glide velocity in GUI px/s; zero when the list is at rest. */
+    private double glideVelocity;
+    /** Timestamp of the last drawn frame, for the time-normalised decay. */
     private long lastFrameMs = -1L;
 
     public ConfigEntryList(Minecraft mc, int width, int height, int y0, int rowWidth, List<Row> rows) {
@@ -78,26 +76,26 @@ public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryLis
     }
 
     /**
-     * Wheel input only moves the animation target; the actual scroll amount chases it in
-     * {@link #extractWidgetRenderState}. Sign and rate match vanilla's own wheel handling
-     * ({@code scrollAmount - yDelta * scrollRate()}).
+     * Wheel input adds glide velocity; the position coasts in {@link #advanceGlide}. Sign matches
+     * vanilla's own wheel handling ({@code scrollAmount - yDelta * scrollRate()}), and one notch
+     * travels {@code scrollRate()} pixels in total because v0 = distance * friction for an
+     * exponential decay.
      */
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double xDelta, double yDelta) {
         if (!this.scrollable()) {
             return super.mouseScrolled(mouseX, mouseY, xDelta, yDelta);
         }
-        this.scrollTarget = Math.clamp(this.scrollTarget - yDelta * this.scrollRate(),
-                0.0, this.maxScrollAmount());
+        this.glideVelocity = Math.clamp(
+                this.glideVelocity - yDelta * this.scrollRate() * SCROLL_FRICTION,
+                -SCROLL_MAX_SPEED, SCROLL_MAX_SPEED);
         return true;
     }
 
     /**
      * GUI pixels per wheel notch. Vanilla's own rate is {@code entryHeight / 2} (bytecode-verified:
      * the list constructor passes that to the scrollbar settings), half a row, which reads as
-     * sluggish on a sparse config screen. Two rows per notch feels like a modern app, and because
-     * the wheel only moves the animation target, fast multi-notch spins still glide instead of
-     * jumping.
+     * sluggish on a sparse config screen. Two rows per notch feels like a modern app.
      */
     @Override
     protected double scrollRate() {
@@ -106,37 +104,32 @@ public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryLis
 
     /**
      * Every scroll change that is not ours (scrollbar drag, keyboard, scrollToEntry) is
-     * authoritative: snap the animation state to it and apply it instantly.
+     * authoritative: cancel the glide and apply instantly, so the thumb keeps up with the pointer.
      */
     @Override
     public void setScrollAmount(double amount) {
-        if (this.applyingEasedScroll) {
-            super.setScrollAmount(amount);
-            return;
-        }
-        this.scrollEased = this.scrollTarget = amount;
+        this.glideVelocity = 0.0;
         super.setScrollAmount(amount);
     }
 
     /**
-     * Sets the wheel target directly; the eased glide then chases it (clamped to the scroll
-     * range in {@link #advanceSmoothScroll}). Also used by the preview workbench to hold the
-     * list at exact scroll offsets.
+     * Jumps to a scroll offset, cancelling any glide. Kept for the preview workbench, which pins
+     * the list at exact offsets for screenshots.
      */
     public void smoothScrollTo(double target) {
-        this.scrollTarget = target;
+        this.setScrollAmount(target);
     }
 
     @Override
     public void extractWidgetRenderState(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
-        // Ease before super so the rows, scrollbar and separators all extract from the freshly
-        // eased amount in the same frame.
-        this.advanceSmoothScroll();
+        // Coast before super so the rows, scrollbar and separators all extract from the freshly
+        // advanced amount in the same frame.
+        this.advanceGlide();
         super.extractWidgetRenderState(gfx, mouseX, mouseY, partialTick);
     }
 
-    /** Moves the eased scroll amount toward the wheel target and applies it to the list. */
-    private void advanceSmoothScroll() {
+    /** Advances the momentum glide and applies it to the list. */
+    private void advanceGlide() {
         // Track the frame gap on every frame so it is fresh when a wheel event arrives after
         // a long idle period (a stale gap would teleport the glide on the first frame).
         long now = Util.getMillis();
@@ -144,32 +137,28 @@ public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryLis
                 ? 0.0
                 : Math.min((now - this.lastFrameMs) / 1000.0, MAX_FRAME_SECONDS);
         this.lastFrameMs = now;
-        if (this.scrollable()) {
-            this.scrollTarget = Math.clamp(this.scrollTarget, 0.0, this.maxScrollAmount());
-            if (Math.abs(this.scrollTarget - this.scrollEased) <= SCROLL_SETTLE) {
-                this.scrollEased = this.scrollTarget;
-            } else {
-                this.scrollEased += (this.scrollTarget - this.scrollEased)
-                        * (1.0 - Math.exp(-dt * SCROLL_SPEED));
-            }
-        } else {
-            this.scrollTarget = 0.0;
-            this.scrollEased = 0.0;
+        if (this.glideVelocity == 0.0 || !this.scrollable()) {
+            return;
         }
-        if (this.scrollEased != this.scrollAmount()) {
-            this.applyingEasedScroll = true;
-            super.setScrollAmount(this.scrollEased);
-            this.applyingEasedScroll = false;
-            // The super setter clamps; keep our state in sync with what actually applied.
-            this.scrollEased = this.scrollTarget = this.scrollAmount();
+        double scrolled = this.scrollAmount() + this.glideVelocity * dt;
+        this.glideVelocity *= Math.exp(-dt * SCROLL_FRICTION);
+        if (Math.abs(this.glideVelocity) < SCROLL_STOP) {
+            this.glideVelocity = 0.0;
         }
+        double clamped = Math.clamp(scrolled, 0.0, this.maxScrollAmount());
+        if (clamped != scrolled) {
+            // Reached an end of the list: stop dead instead of pressing against the edge.
+            this.glideVelocity = 0.0;
+        }
+        // The super setter, not the override: the glide must not cancel itself.
+        super.setScrollAmount(clamped);
     }
 
     /**
      * Draws each row shifted by the scroll fraction vanilla drops: rows sit at
      * {@code firstEntryY - (int) scrollAmount}, so the true (fractional) position is
-     * {@code rowY - frac}. Without this the eased scroll moves content in whole-GUI-pixel
-     * stair-steps (3 screen px per GUI px at scale 3) instead of gliding smoothly.
+     * {@code rowY - frac}. Without this the glide moves content in whole-GUI-pixel stair-steps
+     * (3 screen px per GUI px at scale 3) instead of coasting smoothly.
      */
     @Override
     protected void extractItem(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick, Row entry) {

@@ -10,7 +10,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * Pill toggle: a capsule track (accent when on, neutral when off) with a round knob that slides
+ * Pill toggle: a capsule track (near-white when on, dark when off) with a round knob that slides
  * between the ends. Reads its state through the entry's getter every frame, so external changes
  * show immediately, and writes through on press (live preview).
  *
@@ -55,11 +55,13 @@ public class PillToggleWidget extends AbstractButton {
                 : (hovered ? GuiUtil.SLIDER_TRACK_HOVER : GuiUtil.OFF_TRACK);
         Ui.pill(gfx, this.getX(), this.getY(), this.getWidth(), this.getHeight(), track);
 
+        // Dark knob on the light on-track, light knob on the dark off-track.
+        int knob = on ? GuiUtil.TEXT_ON_ACCENT : GuiUtil.TEXT;
         float knobRadius = this.getHeight() / 2.0f - KNOB_INSET;
         float left = this.getX() + KNOB_INSET + knobRadius;
         float right = this.getX() + this.getWidth() - KNOB_INSET - knobRadius;
         float cx = left + (right - left) * this.knobPos;
-        Ui.circle(gfx, cx, this.getY() + this.getHeight() / 2.0f, knobRadius, GuiUtil.TEXT);
+        Ui.circle(gfx, cx, this.getY() + this.getHeight() / 2.0f, knobRadius, knob);
     }
 
     @Override
