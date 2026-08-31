@@ -1,0 +1,15 @@
+{
+	"required": true,
+	"minVersion": "0.8",
+	"package": "net.fayber.fayberconfig.bridge.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"plugin": "net.fayber.fayberconfig.bridge.mixin.ClothBridgeMixinPlugin",
+	"client": [
+		"ConfigBuilderImplMixin",
+		"FieldBuilderMixin",
+		"RangeFieldBuilderAccessor"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

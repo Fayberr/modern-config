@@ -11,10 +11,13 @@ base {
 }
 
 repositories {
-	// No third-party mod dependencies: the library is vanilla + fabric-api only.
 	// The embedded fayber-gui toolkit comes from mavenLocal (publish it with
 	// `publishToMavenLocal` from the Fayber GUI project first).
 	mavenLocal()
+
+	// Cloth Config, for the optional bridge only: compileOnly, guarded by a mixin plugin, so
+	// Fayber Config still runs (and the mixins stay inert) when Cloth is absent.
+	maven { url = "https://maven.shedaniel.me/" }
 }
 
 dependencies {
@@ -29,6 +32,11 @@ dependencies {
 	// fayber-config. 26.1 is obfuscation-free, so no remapping is involved.
 	implementation "net.fayber:fayber-gui:${project.fayber_gui_version}"
 	include "net.fayber:fayber-gui:${project.fayber_gui_version}"
+
+	// Cloth Config: compile against it for the bridge mixins, never ship or require it.
+	compileOnly("me.shedaniel.cloth:cloth-config-fabric:${project.cloth_config_version}") {
+		exclude(group: "net.fabricmc.fabric-api")
+	}
 }
 
 // Dev-only design workbench: `./gradlew runClient -PfcPreview=true` boots the client at a fixed
@@ -61,6 +69,7 @@ processResources {
 
 tasks.withType(JavaCompile).configureEach {
 	it.options.release = 25
+	it.options.compilerArgs << "-Xlint:deprecation"
 }
 
 java {
