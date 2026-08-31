@@ -127,8 +127,11 @@ public final class ClothBridge {
             int entryCount = 0;
             boolean multipleCategories = categories.size() > 1;
             for (ConfigCategory category : categories) {
+                // Cloth shows multiple categories as tabs; so does the Fayber screen. A single
+                // category stays a flat list, matching Cloth. Sub categories inside a category
+                // are headers, like Cloth's collapsible sections.
                 if (multipleCategories) {
-                    builder.category(category.getCategoryKey().getString());
+                    builder.tab(category.getCategoryKey().getString());
                 }
                 for (Object raw : category.getEntries()) {
                     entryCount++;
@@ -285,7 +288,7 @@ public final class ClothBridge {
         EntryPlumbing plumbing = PLUMBING.get(entry);
         if (plumbing == null || plumbing.saveConsumer() == null) {
             // No way to persist edits: refuse rather than render a dead control.
-            return "'" + label + "' (" + entry.getClass().getSimpleName() + ") has no captured save consumer";
+            return "'" + label + "' (" + kindOf(entry) + ") has no captured save consumer";
         }
         Consumer<Object> save = plumbing.saveConsumer();
         onSave.add(() -> {
@@ -427,11 +430,20 @@ public final class ClothBridge {
             // a kind from a future Cloth version): not translated, so the whole screen stays
             // Cloth's (logged above). NestedListListEntry also lands here via the plumbing check:
             // no Cloth builder constructs it, so no save consumer is ever captured for it.
-            return "'" + label + "' is a " + entry.getClass().getSimpleName() + ", which is not supported";
+            return "'" + label + "' is a " + kindOf(entry) + ", which is not supported";
         }
 
         tooltipOf(entry).ifPresent(builder::tooltip);
         return null;
+    }
+
+    /**
+     * The entry kind for log messages. Anonymous subclasses (mod proxies) have an empty simple
+     * name, which read as "()" in refusals; the full name at least says where it came from.
+     */
+    private static String kindOf(Object entry) {
+        String simple = entry.getClass().getSimpleName();
+        return simple.isEmpty() ? entry.getClass().getName() : simple;
     }
 
     private static void addCycle(FayberConfigScreen.Builder builder, String label, Object entry,

@@ -3,6 +3,8 @@ package net.fayber.fayberconfig.api;
 import net.fayber.faybergui.render.Theme;
 import net.fayber.faybergui.render.Ui;
 import net.fayber.faybergui.widget.FlatButton;
+import net.fayber.faybergui.widget.HorizontalScrollPanel;
+import net.fayber.faybergui.widget.Tabs;
 import net.fayber.fayberconfig.gui.ConfigEntryList;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
@@ -30,8 +32,10 @@ import org.jetbrains.annotations.Nullable;
  * its current value; Cancel or ESC restores all snapshots, Save runs the consumer's
  * {@code onSave} (which persists the config) and returns to the parent screen.
  *
- * <p>Build one through {@link #builder}: categories first, then entries; {@code .tooltip(...)}
- * attaches to the entry added just before it.
+ * <p>Build one through {@link #builder}: optionally tabs ({@code .tab(...)}), then categories
+ * and entries; {@code .tooltip(...)} attaches to the entry added just before it. A screen with
+ * tabs shows one tab's entries at a time in the scrolling column, like the tab strip Cloth
+ * Config draws for multi-category configs.
  *
  * <p>Layout is done by hand rather than with {@code HeaderAndFooterLayout} because everything has
  * to line up with the centred column, not the window: the list is positioned explicitly with
@@ -59,6 +63,10 @@ public class FayberConfigScreen extends Screen {
     @Nullable
     private final Runnable onSave;
     private final List<ConfigEntry> entries;
+    /** Tab labels, in order; empty when the screen has no tabs and one flat list. */
+    private final List<String> tabLabels;
+    /** Parallel to entries: the tab index each entry belongs to, or -1 for always visible. */
+    private final List<Integer> tabOfEntries;
     /** Small secondary action pinned to the true bottom right corner, outside the card column. */
     @Nullable
     private final CornerButton cornerButton;
@@ -75,6 +83,9 @@ public class FayberConfigScreen extends Screen {
     private final Theme theme = Theme.dark();
 
     private ConfigEntryList list;
+    /** The rows of the list, parallel to entries; kept so tab switches can toggle visibility. */
+    private List<ConfigEntryList.Row> rows = List.of();
+    private int activeTab = 0;
     private boolean closed = false;
 
     private int columnX;
@@ -82,13 +93,16 @@ public class FayberConfigScreen extends Screen {
     private int titleY;
 
     FayberConfigScreen(Component title, @Nullable Screen parent, @Nullable Runnable onSave,
-                       List<ConfigEntry> entries, @Nullable CornerButton cornerButton) {
+                       List<ConfigEntry> entries, @Nullable CornerButton cornerButton,
+                       List<String> tabLabels, List<Integer> tabOfEntries) {
         // Kept raw: the Inter variant depends on the GUI scale, so it is applied at draw time.
         super(title);
         this.parent = parent;
         this.onSave = onSave;
         this.entries = entries;
         this.cornerButton = cornerButton;
+        this.tabLabels = tabLabels;
+        this.tabOfEntries = tabOfEntries;
     }
 
     public static Builder builder(Component title, @Nullable Screen parent, @Nullable Runnable onSave) {
@@ -110,6 +124,12 @@ public class FayberConfigScreen extends Screen {
         boolean compact = this.height < COMPACT_BELOW;
         this.titleY = compact ? 14 : TITLE_Y;
         int listTop = compact ? 32 : LIST_TOP;
+        // With tabs the bar sits between the title and the list, pushing the column down.
+        int tabsY = 0;
+        if (!this.tabLabels.isEmpty()) {
+            tabsY = this.titleY + this.minecraft.font.lineHeight + (compact ? 3 : 5);
+            listTop = tabsY + Tabs.HEIGHT + (compact ? 4 : 8);
+        }
         int buttonH = compact ? 24 : BUTTON_HEIGHT;
         // A corner button owns a small strip at the true bottom right, so the footer lifts above it.
         int footerMargin = compact ? 8 : FOOTER_MARGIN;
@@ -125,6 +145,7 @@ public class FayberConfigScreen extends Screen {
         for (ConfigEntry entry : this.entries) {
             rows.add(entry.createRow());
         }
+        this.rows = rows;
 
         int buttonY = this.height - buttonH - footerMargin;
         int listH = Math.max(ConfigEntryList.ROW_HEIGHT, buttonY - 12 - listTop);
@@ -137,6 +158,23 @@ public class FayberConfigScreen extends Screen {
         this.list = new ConfigEntryList(this.minecraft, listW, listH, listTop, this.columnW, rows);
         this.list.updateSizeAndPosition(listW, listH, listX, listTop);
         this.addRenderableWidget(this.list);
+
+        if (!this.tabLabels.isEmpty()) {
+            this.applyVisibility();
+            Tabs tabs = new Tabs(0, 0, this.tabLabels, () -> this.activeTab, this::selectTab).theme(this.theme);
+            if (tabs.getWidth() <= this.columnW) {
+                tabs.setPosition(this.columnX, tabsY);
+                this.addRenderableWidget(tabs);
+            } else {
+                // More tabs than the column fits (Cloth configs love seven categories): the bar
+                // gets its own clipped, wheel-scrollable strip whose scrollbar sits just under
+                // the underline.
+                HorizontalScrollPanel panel =
+                        new HorizontalScrollPanel(this.columnX, tabsY, this.columnW, Tabs.HEIGHT + 6);
+                panel.add(tabs);
+                this.addRenderableWidget(panel);
+            }
+        }
 
         int buttonW = (this.columnW - buttonGap) / 2;
         this.addRenderableWidget(new FlatButton(this.columnX, buttonY, buttonW, buttonH,
@@ -153,6 +191,25 @@ public class FayberConfigScreen extends Screen {
                     this.cornerButton.action(), FlatButton.Style.GHOST);
             corner.theme(this.theme);
             this.addRenderableWidget(corner);
+        }
+    }
+
+    /** Tab bar callback: shows only the new tab's rows and re-lays the list out from the top. */
+    private void selectTab(int index) {
+        if (index == this.activeTab) {
+            return;
+        }
+        this.activeTab = index;
+        this.applyVisibility();
+        // Hidden rows collapse to zero height; setScrollAmount repositions the entries, which is
+        // what recomputes the layout. Starting at the top also fits the fresh, unread content.
+        this.list.setScrollAmount(0);
+    }
+
+    private void applyVisibility() {
+        for (int i = 0; i < this.rows.size(); i++) {
+            int tab = this.tabOfEntries.get(i);
+            this.rows.get(i).setVisible(tab < 0 || tab == this.activeTab);
         }
     }
 
@@ -201,6 +258,10 @@ public class FayberConfigScreen extends Screen {
         @Nullable
         private final Runnable onSave;
         private final List<ConfigEntry> entries = new ArrayList<>();
+        private final List<String> tabs = new ArrayList<>();
+        /** Parallel to entries: the tab each entry was added under, or -1 before the first tab. */
+        private final List<Integer> tabOfEntries = new ArrayList<>();
+        private int currentTab = -1;
         @Nullable
         private CornerButton cornerButton;
 
@@ -210,9 +271,23 @@ public class FayberConfigScreen extends Screen {
             this.onSave = onSave;
         }
 
+        /** Starts a new tab; subsequent entries and category headers belong to it. */
+        public Builder tab(String label) {
+            this.tabs.add(label);
+            this.currentTab = this.tabs.size() - 1;
+            return this;
+        }
+
+        /** Records the entry and the tab it was added under. */
+        private <E extends ConfigEntry> E addEntry(E entry) {
+            this.tabOfEntries.add(this.currentTab);
+            this.entries.add(entry);
+            return entry;
+        }
+
         /** Starts a new category section (inserts a header row). */
         public Builder category(String name) {
-            this.entries.add(new ConfigEntry.Header(name));
+            this.addEntry(new ConfigEntry.Header(name));
             return this;
         }
 
@@ -228,34 +303,34 @@ public class FayberConfigScreen extends Screen {
         }
 
         public Builder bool(String label, Supplier<Boolean> getter, Consumer<Boolean> setter) {
-            this.entries.add(new ConfigEntry.Bool(label, getter, setter));
+            this.addEntry(new ConfigEntry.Bool(label, getter, setter));
             return this;
         }
 
         public Builder intSlider(String label, IntSupplier getter, IntConsumer setter, int min, int max, int step) {
-            this.entries.add(new ConfigEntry.IntSlider(label, getter, setter, min, max, step));
+            this.addEntry(new ConfigEntry.IntSlider(label, getter, setter, min, max, step));
             return this;
         }
 
         public Builder floatSlider(String label, Supplier<Float> getter, Consumer<Float> setter, float min, float max, float step) {
-            this.entries.add(new ConfigEntry.FloatSlider(label, getter, setter, min, max, step));
+            this.addEntry(new ConfigEntry.FloatSlider(label, getter, setter, min, max, step));
             return this;
         }
 
         public Builder doubleSlider(String label, Supplier<Double> getter, Consumer<Double> setter, double min, double max, double step) {
-            this.entries.add(new ConfigEntry.DoubleSlider(label, getter, setter, min, max, step));
+            this.addEntry(new ConfigEntry.DoubleSlider(label, getter, setter, min, max, step));
             return this;
         }
 
         public Builder text(String label, Supplier<String> getter, Consumer<String> setter, int maxLength) {
-            this.entries.add(new ConfigEntry.Text(label, getter, setter, maxLength));
+            this.addEntry(new ConfigEntry.Text(label, getter, setter, maxLength));
             return this;
         }
 
         /** Text field whose non-conforming input is marked invalid while typing. */
         public Builder text(String label, Supplier<String> getter, Consumer<String> setter, int maxLength,
                             Predicate<String> validator) {
-            this.entries.add(new ConfigEntry.Text(label, getter, setter, maxLength, validator));
+            this.addEntry(new ConfigEntry.Text(label, getter, setter, maxLength, validator));
             return this;
         }
 
@@ -266,12 +341,12 @@ public class FayberConfigScreen extends Screen {
          */
         public <T> Builder cycle(String label, Supplier<T> getter, Consumer<T> setter, T[] values,
                                  Function<T, String> namer) {
-            this.entries.add(new ConfigEntry.Cycle<>(label, getter, setter, values, namer));
+            this.addEntry(new ConfigEntry.Cycle<>(label, getter, setter, values, namer));
             return this;
         }
 
         public Builder button(String label, Runnable onPress) {
-            this.entries.add(new ConfigEntry.Button(label, onPress));
+            this.addEntry(new ConfigEntry.Button(label, onPress));
             return this;
         }
 
@@ -281,7 +356,7 @@ public class FayberConfigScreen extends Screen {
          * {@code 1000 + button} for mouse buttons.
          */
         public Builder keybind(String label, IntSupplier getter, IntConsumer setter) {
-            this.entries.add(new ConfigEntry.Keybind(label, getter, setter));
+            this.addEntry(new ConfigEntry.Keybind(label, getter, setter));
             return this;
         }
 
@@ -290,7 +365,7 @@ public class FayberConfigScreen extends Screen {
          * must not contain newlines.
          */
         public Builder stringList(String label, Supplier<List<String>> getter, Consumer<List<String>> setter) {
-            this.entries.add(new ConfigEntry.StringList(label, getter, setter));
+            this.addEntry(new ConfigEntry.StringList(label, getter, setter));
             return this;
         }
 
@@ -306,7 +381,8 @@ public class FayberConfigScreen extends Screen {
 
         public FayberConfigScreen build() {
             return new FayberConfigScreen(this.title, this.parent, this.onSave,
-                    List.copyOf(this.entries), this.cornerButton);
+                    List.copyOf(this.entries), this.cornerButton,
+                    List.copyOf(this.tabs), List.copyOf(this.tabOfEntries));
         }
     }
 }

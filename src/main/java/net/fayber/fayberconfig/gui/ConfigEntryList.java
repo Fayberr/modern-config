@@ -46,8 +46,37 @@ public class ConfigEntryList extends CardList {
         return this;
     }
 
-    /** Base row: the card drawing and theme access come from {@link CardList.Row}. */
+    /**
+     * Base row: the card drawing and theme access come from {@link CardList.Row}, plus tab
+     * visibility. A hidden row (its tab is not selected) has zero height, no children and draws
+     * nothing, so the list lays out, scrolls and hit-tests as if it were absent: 26.1's
+     * {@code AbstractSelectionList} walks {@code Entry.getHeight()} on every reposition
+     * (bytecode-verified), and {@code setScrollAmount} repositions, which is the re-layout
+     * trigger after switching tabs.
+     */
     public abstract static class Row extends CardList.Row {
+        private boolean visible = true;
+
+        public final void setVisible(boolean visible) {
+            this.visible = visible;
+        }
+
+        public final boolean isVisible() {
+            return this.visible;
+        }
+
+        /** The row's interactive children; subclasses implement this instead of {@link #children()}. */
+        protected abstract List<? extends GuiEventListener> visibleChildren();
+
+        @Override
+        public final List<? extends GuiEventListener> children() {
+            return this.visible ? this.visibleChildren() : List.of();
+        }
+
+        @Override
+        public int getHeight() {
+            return this.visible ? super.getHeight() : 0;
+        }
     }
 
     /** Category title row: a small muted all-caps label, no card. */
@@ -59,12 +88,15 @@ public class ConfigEntryList extends CardList {
         }
 
         @Override
-        public List<? extends GuiEventListener> children() {
+        protected List<? extends GuiEventListener> visibleChildren() {
             return List.of();
         }
 
         @Override
         public void extractContent(GuiGraphicsExtractor gfx, int mouseX, int mouseY, boolean hovered, float partialTick) {
+            if (!this.isVisible()) {
+                return;
+            }
             int y = this.cardY() + CARD_HEIGHT - Ui.font().lineHeight - 4;
             Ui.text(gfx, this.title, this.getX() + 2, y, this.theme().textMuted);
         }
@@ -87,12 +119,15 @@ public class ConfigEntryList extends CardList {
         }
 
         @Override
-        public List<? extends GuiEventListener> children() {
+        protected List<? extends GuiEventListener> visibleChildren() {
             return List.of(this.widget);
         }
 
         @Override
         public void extractContent(GuiGraphicsExtractor gfx, int mouseX, int mouseY, boolean hovered, float partialTick) {
+            if (!this.isVisible()) {
+                return;
+            }
             this.drawRowCard(gfx, hovered);
             Ui.text(gfx, this.label, this.getX() + CARD_PADDING, this.textY(), this.theme().text);
             this.widget.setPosition(
@@ -130,16 +165,19 @@ public class ConfigEntryList extends CardList {
 
         @Override
         public int getHeight() {
-            return this.height;
+            return this.isVisible() ? this.height : 0;
         }
 
         @Override
-        public List<? extends GuiEventListener> children() {
+        protected List<? extends GuiEventListener> visibleChildren() {
             return List.of(this.widget);
         }
 
         @Override
         public void extractContent(GuiGraphicsExtractor gfx, int mouseX, int mouseY, boolean hovered, float partialTick) {
+            if (!this.isVisible()) {
+                return;
+            }
             Ui.roundRectBorder(gfx, this.getX(), this.cardY(), this.getWidth(), this.height, CARD_RADIUS,
                     hovered ? this.theme().cardHover : this.theme().card,
                     hovered ? this.theme().cardBorderHover : this.theme().cardBorder, 1.0f);
@@ -163,12 +201,15 @@ public class ConfigEntryList extends CardList {
         }
 
         @Override
-        public List<? extends GuiEventListener> children() {
+        protected List<? extends GuiEventListener> visibleChildren() {
             return List.of(this.slider);
         }
 
         @Override
         public void extractContent(GuiGraphicsExtractor gfx, int mouseX, int mouseY, boolean hovered, float partialTick) {
+            if (!this.isVisible()) {
+                return;
+            }
             this.drawRowCard(gfx, hovered);
             this.slider.setPosition(this.getX(), this.cardY());
             this.slider.setWidth(this.getWidth());
