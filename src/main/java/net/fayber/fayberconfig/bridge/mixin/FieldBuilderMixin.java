@@ -41,6 +41,14 @@ public abstract class FieldBuilderMixin {
             Consumer<Object> saveConsumer = null;
             if ((Object) this instanceof AbstractFieldBuilder<?, ?, ?> fieldBuilder) {
                 saveConsumer = (Consumer<Object>) fieldBuilder.getSaveConsumer();
+            } else if ((Object) this instanceof KeyCodeBuilderAccessor keyCodeBuilder) {
+                // KeyCodeBuilder and DropdownMenuBuilder extend FieldBuilder directly and keep
+                // their save consumer in their own field, invisible to the AbstractFieldBuilder
+                // read above. Without these branches every key bind and dropdown entry was
+                // recorded with a null consumer and refused at translation time.
+                saveConsumer = (Consumer<Object>) keyCodeBuilder.fayberconfig$saveConsumer();
+            } else if ((Object) this instanceof DropdownMenuBuilderAccessor dropdownBuilder) {
+                saveConsumer = (Consumer<Object>) dropdownBuilder.fayberconfig$saveConsumer();
             }
             Object min = null;
             Object max = null;

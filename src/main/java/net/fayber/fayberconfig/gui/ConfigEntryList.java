@@ -103,6 +103,55 @@ public class ConfigEntryList extends CardList {
     }
 
     /**
+     * Row with a label above a taller interactive widget (multi-line editors). The card is as
+     * tall as its contents, which works because 26.1's {@code AbstractSelectionList} walks
+     * {@code Entry.getHeight()} per entry when positioning, hit-testing and computing the scroll
+     * bounds (bytecode-verified), so an override is honoured everywhere without touching the
+     * list itself.
+     */
+    public static class TallWidgetRow extends Row {
+        private static final float CARD_RADIUS = 6.0f;
+        private static final int TOP_PAD = 8;
+        private static final int LABEL_GAP = 6;
+        private static final int BOTTOM_PAD = 10;
+
+        private final Component label;
+        private final AbstractWidget widget;
+        private final int height;
+
+        public TallWidgetRow(Component label, Component tooltip, AbstractWidget widget) {
+            this.label = Ui.ui(label);
+            this.widget = widget;
+            if (tooltip != null) {
+                widget.setTooltip(Tooltip.create(Ui.ui(tooltip)));
+            }
+            this.height = TOP_PAD + Ui.font().lineHeight + LABEL_GAP + widget.getHeight() + BOTTOM_PAD;
+        }
+
+        @Override
+        public int getHeight() {
+            return this.height;
+        }
+
+        @Override
+        public List<? extends GuiEventListener> children() {
+            return List.of(this.widget);
+        }
+
+        @Override
+        public void extractContent(GuiGraphicsExtractor gfx, int mouseX, int mouseY, boolean hovered, float partialTick) {
+            Ui.roundRectBorder(gfx, this.getX(), this.cardY(), this.getWidth(), this.height, CARD_RADIUS,
+                    hovered ? this.theme().cardHover : this.theme().card,
+                    hovered ? this.theme().cardBorderHover : this.theme().cardBorder, 1.0f);
+            Ui.text(gfx, this.label, this.getX() + CARD_PADDING, this.cardY() + TOP_PAD, this.theme().text);
+            this.widget.setPosition(this.getX() + CARD_PADDING,
+                    this.cardY() + TOP_PAD + Ui.font().lineHeight + LABEL_GAP);
+            this.widget.setWidth(this.getWidth() - 2 * CARD_PADDING);
+            this.widget.extractRenderState(gfx, mouseX, mouseY, partialTick);
+        }
+    }
+
+    /**
      * Row whose single slider spans the full card: the slider draws label, snapped value, track
      * and knob itself.
      */

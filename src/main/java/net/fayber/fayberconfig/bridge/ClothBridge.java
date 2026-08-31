@@ -3,21 +3,26 @@ package net.fayber.fayberconfig.bridge;
 import me.shedaniel.clothconfig2.api.AbstractConfigListEntry;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.gui.entries.BooleanListEntry;
+import me.shedaniel.clothconfig2.gui.entries.ColorEntry;
 import me.shedaniel.clothconfig2.gui.entries.DoubleListEntry;
 import me.shedaniel.clothconfig2.gui.entries.DropdownBoxEntry;
 import me.shedaniel.clothconfig2.gui.entries.EnumListEntry;
 import me.shedaniel.clothconfig2.gui.entries.FloatListEntry;
 import me.shedaniel.clothconfig2.gui.entries.IntegerListEntry;
 import me.shedaniel.clothconfig2.gui.entries.IntegerSliderEntry;
+import me.shedaniel.clothconfig2.gui.entries.KeyCodeEntry;
 import me.shedaniel.clothconfig2.gui.entries.LongListEntry;
 import me.shedaniel.clothconfig2.gui.entries.LongSliderEntry;
+import me.shedaniel.clothconfig2.gui.entries.SelectionListEntry;
 import me.shedaniel.clothconfig2.gui.entries.StringListEntry;
+import me.shedaniel.clothconfig2.gui.entries.StringListListEntry;
 import me.shedaniel.clothconfig2.gui.entries.SubCategoryListEntry;
 import me.shedaniel.clothconfig2.gui.entries.TextListEntry;
 import me.shedaniel.clothconfig2.gui.entries.TooltipListEntry;
 import net.fayber.faybergui.render.Theme;
 import net.fayber.faybergui.widget.FlatButton;
 import net.fayber.fayberconfig.api.FayberConfigScreen;
+import net.fayber.fayberconfig.bridge.mixin.SelectionListEntryAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.components.AbstractWidget;
@@ -59,6 +64,16 @@ public final class ClothBridge {
     private static final java.util.function.Predicate<String> INT_LIKE = s -> s.matches("-?\\d*");
     private static final java.util.function.Predicate<String> NUMBER_LIKE =
             s -> s.matches("-?\\d*(\\.\\d*)?([eE][-+]?\\d+)?");
+    private static final java.util.function.Predicate<String> HEX_LIKE =
+            s -> s.matches("#?[0-9a-fA-F]{0,8}");
+
+    /**
+     * Every modifier combination a Cloth key bind can carry, for the modifier cycle. The order
+     * of {@code Modifier.of}'s three booleans is not documented, so each combination is deduped
+     * by its bit value and named by probing {@code hasControl}/{@code hasAlt}/{@code hasShift};
+     * that also keeps the cycle's {@code equals} matching working against Cloth's own instances.
+     */
+    private static final me.shedaniel.clothconfig2.api.Modifier[] MODIFIER_COMBOS = buildModifierCombos();
 
     public static final Logger LOGGER = LoggerFactory.getLogger("FayberConfig/ClothBridge");
 
@@ -107,10 +122,12 @@ public final class ClothBridge {
                 }
                 for (Object raw : category.getEntries()) {
                     if (!(raw instanceof AbstractConfigListEntry<?> entry)) {
-                        return null;
+                        return refused(title, "an entry is not a standard Cloth entry ("
+                                + raw.getClass().getName() + ")");
                     }
-                    if (!addEntry(builder, entry, staged, onSave, "")) {
-                        return null;
+                    String reason = addEntry(builder, entry, staged, onSave, "");
+                    if (reason != null) {
+                        return refused(title, reason);
                     }
                 }
             }
@@ -129,6 +146,18 @@ public final class ClothBridge {
             LOGGER.warn("Cloth bridge failed for '{}', falling back to the original screen", title.getString(), t);
             return null;
         }
+    }
+
+    /**
+     * Logs why a screen stays on Cloth and returns null (the caller's translation abort). One
+     * INFO line per refused screen: refusals used to be silent, which is how "most mods just
+     * show the Cloth menu" went undiagnosed until the mod jars were pulled and scanned.
+     */
+    @Nullable
+    private static Screen refused(Component title, String reason) {
+        LOGGER.info("Not translating the Cloth config for '{}': {} (showing Cloth's own screen)",
+                title.getString(), reason);
+        return null;
     }
 
     /** How a successfully translated Cloth screen was built, for the reverse button. */
@@ -193,10 +222,12 @@ public final class ClothBridge {
      * Adds one Cloth entry to the Fayber builder.
      *
      * @param prefix label prefix for entries nested in a sub category
-     * @return false when the entry kind is not supported (caller aborts the whole translation)
+     * @return null when the entry was translated, otherwise a short reason why it cannot be
+     *         (the caller aborts the whole translation and logs it)
      */
-    private static boolean addEntry(FayberConfigScreen.Builder builder, AbstractConfigListEntry<?> entry,
-                                    Map<Object, Object> staged, List<Runnable> onSave, String prefix) {
+    @Nullable
+    private static String addEntry(FayberConfigScreen.Builder builder, AbstractConfigListEntry<?> entry,
+                                   Map<Object, Object> staged, List<Runnable> onSave, String prefix) {
         String label = prefix + entry.getFieldName().getString();
 
         // Sub categories become a header plus their children, since Fayber screens are one flat
@@ -204,24 +235,25 @@ public final class ClothBridge {
         if (entry instanceof SubCategoryListEntry sub) {
             builder.category(label);
             for (AbstractConfigListEntry<?> child : sub.getValue()) {
-                if (!addEntry(builder, child, staged, onSave, "")) {
-                    return false;
+                String reason = addEntry(builder, child, staged, onSave, "");
+                if (reason != null) {
+                    return reason;
                 }
             }
-            return true;
+            return null;
         }
 
         // Static text: a label row with no value. Fayber has no text-only entry, so it becomes a
         // header, which reads correctly for the section captions these are normally used for.
         if (entry instanceof TextListEntry) {
             builder.category(label);
-            return true;
+            return null;
         }
 
         EntryPlumbing plumbing = PLUMBING.get(entry);
         if (plumbing == null || plumbing.saveConsumer() == null) {
             // No way to persist edits: refuse rather than render a dead control.
-            return false;
+            return "'" + label + "' (" + entry.getClass().getSimpleName() + ") has no captured save consumer";
         }
         Consumer<Object> save = plumbing.saveConsumer();
         onSave.add(() -> {
@@ -232,6 +264,31 @@ public final class ClothBridge {
 
         if (entry instanceof BooleanListEntry e) {
             builder.bool(label, () -> (Boolean) current(staged, e, e.getValue()), v -> staged.put(e, v));
+        } else if (entry instanceof KeyCodeEntry e) {
+            me.shedaniel.clothconfig2.api.ModifierKeyCode bind = e.getValue();
+            if (bind == null) {
+                return "'" + label + "' (key bind) has no value";
+            }
+            // The bind is staged as a ModifierKeyCode copy so a key edit never clobbers the
+            // modifier and vice versa; both rows read the same staged object.
+            builder.keybind(label,
+                    () -> keyCodeOf(currentBind(staged, e, bind)),
+                    code -> stageKeyCode(staged, e, currentBind(staged, e, bind), code,
+                            e.isAllowKey(), e.isAllowMouse()));
+            if (e.isAllowModifiers()) {
+                builder.cycle(label + " modifiers",
+                        () -> currentBind(staged, e, bind).getModifier(),
+                        m -> staged.put(e, me.shedaniel.clothconfig2.api.ModifierKeyCode
+                                .copyOf(currentBind(staged, e, bind)).setModifier(m)),
+                        MODIFIER_COMBOS, ClothBridge::modifierName);
+            }
+        } else if (entry instanceof ColorEntry e) {
+            // Cloth's own widget also edits hex text; 6-digit input is opaque, 8-digit carries
+            // the alpha byte through, and only parseable values are staged.
+            builder.text(label,
+                    () -> hexOf((Number) current(staged, e, e.getValue())),
+                    v -> parseHexColor(v).ifPresent(i -> staged.put(e, i)),
+                    10, HEX_LIKE);
         } else if (entry instanceof IntegerSliderEntry e) {
             int min = intOf(plumbing.min(), 0);
             int max = intOf(plumbing.max(), 100);
@@ -242,7 +299,7 @@ public final class ClothBridge {
             long min = longOf(plumbing.min(), 0L);
             long max = longOf(plumbing.max(), 100L);
             if (min < Integer.MIN_VALUE || max > Integer.MAX_VALUE) {
-                return false;
+                return "'" + label + "' is a long slider whose range does not fit an int";
             }
             builder.intSlider(label, () -> ((Number) current(staged, e, e.getValue())).intValue(),
                     v -> staged.put(e, (long) v), (int) min, (int) max, 1);
@@ -284,6 +341,14 @@ public final class ClothBridge {
         } else if (entry instanceof StringListEntry e) {
             builder.text(label, () -> (String) current(staged, e, e.getValue()),
                     v -> staged.put(e, v), 256);
+        } else if (entry instanceof StringListListEntry e) {
+            // The list editor becomes a multi-line text area, one item per line. Items keep
+            // their order and are rebuilt from the lines on every edit; empty lists come back
+            // as one empty line, matching Cloth's own editor, which always shows one cell.
+            List<String> value = e.getValue();
+            builder.stringList(label,
+                    () -> stringListOf(staged, e, value),
+                    v -> staged.put(e, v));
         } else if (entry instanceof EnumListEntry<?> e) {
             // Only EnumListEntry, not its SelectionListEntry parent: Cloth fills an enum entry with
             // every constant of the type, but a plain SelectionListEntry may hold an arbitrary
@@ -291,29 +356,37 @@ public final class ClothBridge {
             // user pick values the mod never allowed.
             Object value = e.getValue();
             if (value == null) {
-                return false;
+                return "'" + label + "' (enum) has no value";
             }
             // An enum constant with a body is an anonymous subclass, whose isEnum() is false and
             // whose getEnumConstants() is null; getDeclaringClass() gives the real enum type.
             Object[] values = ((Enum<?>) value).getDeclaringClass().getEnumConstants();
             if (values == null || values.length == 0) {
-                return false;
+                return "'" + label + "' (enum) has no constants";
             }
             addCycle(builder, label, e, values, staged);
+        } else if (entry instanceof SelectionListEntry<?> e) {
+            // A non-enum selector: the values live in a private field with no public read path,
+            // reached through the accessor mixin.
+            List<?> values = ((SelectionListEntryAccessor) (Object) e).fayberconfig$values();
+            if (values == null || values.isEmpty()) {
+                return "'" + label + "' (selector) has no values";
+            }
+            addCycle(builder, label, e, values.toArray(), staged);
         } else if (entry instanceof DropdownBoxEntry<?> e) {
             List<?> selections = e.getSelections();
             if (selections == null || selections.isEmpty()) {
-                return false;
+                return "'" + label + "' (dropdown) has no options";
             }
             addCycle(builder, label, e, selections.toArray(), staged);
         } else {
-            // KeyCodeEntry, ColorEntry, the *ListListEntry list editors and anything a future Cloth
-            // version adds: not translated yet, so the whole screen stays Cloth's.
-            return false;
+            // The remaining *ListListEntry number-list editors and anything a future Cloth
+            // version adds: not translated, so the whole screen stays Cloth's (logged above).
+            return "'" + label + "' is a " + entry.getClass().getSimpleName() + ", which is not supported";
         }
 
         tooltipOf(entry).ifPresent(builder::tooltip);
-        return true;
+        return null;
     }
 
     private static void addCycle(FayberConfigScreen.Builder builder, String label, Object entry,
@@ -328,6 +401,119 @@ public final class ClothBridge {
     /** The staged edit if the user changed this entry, otherwise Cloth's own current value. */
     private static Object current(Map<Object, Object> staged, Object entry, Object clothValue) {
         return staged.getOrDefault(entry, clothValue);
+    }
+
+    /** The staged key bind (a ModifierKeyCode copy) or Cloth's own. */
+    private static me.shedaniel.clothconfig2.api.ModifierKeyCode currentBind(
+            Map<Object, Object> staged, Object entry, me.shedaniel.clothconfig2.api.ModifierKeyCode fallback) {
+        Object value = staged.get(entry);
+        return value instanceof me.shedaniel.clothconfig2.api.ModifierKeyCode bind ? bind : fallback;
+    }
+
+    /** The staged string list or Cloth's own. */
+    private static List<String> stringListOf(Map<Object, Object> staged, Object entry, List<String> fallback) {
+        Object value = staged.get(entry);
+        return value instanceof List<?> list ? (List<String>) list : fallback;
+    }
+
+    /** Cloth bind to toolkit code: GLFW keycodes as-is, mouse buttons at 1000 + button. */
+    private static int keyCodeOf(me.shedaniel.clothconfig2.api.ModifierKeyCode bind) {
+        com.mojang.blaze3d.platform.InputConstants.Key key = bind.getKeyCode();
+        if (key == null) {
+            return -1;
+        }
+        // Scan codes have no faithful int form in the toolkit's convention; they show as
+        // unbound and rebinding writes a keysym, which is what mods persist anyway.
+        if (key.getType() == com.mojang.blaze3d.platform.InputConstants.Type.MOUSE) {
+            return net.fayber.faybergui.widget.KeybindField.MOUSE_CODE_BASE + key.getValue();
+        }
+        if (key.getType() == com.mojang.blaze3d.platform.InputConstants.Type.KEYSYM) {
+            return key.getValue();
+        }
+        return -1;
+    }
+
+    /** Toolkit code to Cloth bind, honouring what the entry is allowed to accept. */
+    private static void stageKeyCode(Map<Object, Object> staged, Object entry,
+                                     me.shedaniel.clothconfig2.api.ModifierKeyCode current, int code,
+                                     boolean allowKey, boolean allowMouse) {
+        boolean mouse = code >= net.fayber.faybergui.widget.KeybindField.MOUSE_CODE_BASE;
+        if (mouse ? !allowMouse : !allowKey) {
+            // Cloth would not accept this kind of input for this entry; keep the old bind.
+            return;
+        }
+        var key = mouse
+                ? com.mojang.blaze3d.platform.InputConstants.Type.MOUSE
+                        .getOrCreate(code - net.fayber.faybergui.widget.KeybindField.MOUSE_CODE_BASE)
+                : com.mojang.blaze3d.platform.InputConstants.Type.KEYSYM.getOrCreate(code);
+        staged.put(entry, me.shedaniel.clothconfig2.api.ModifierKeyCode.copyOf(current).setKeyCode(key));
+    }
+
+    /** All eight modifier combinations, deduped by bit value. */
+    private static me.shedaniel.clothconfig2.api.Modifier[] buildModifierCombos() {
+        List<me.shedaniel.clothconfig2.api.Modifier> out = new ArrayList<>();
+        out.add(me.shedaniel.clothconfig2.api.Modifier.none());
+        for (boolean alt : new boolean[]{false, true}) {
+            for (boolean ctrl : new boolean[]{false, true}) {
+                for (boolean shift : new boolean[]{false, true}) {
+                    if (!alt && !ctrl && !shift) {
+                        continue; // none() is already in the list
+                    }
+                    me.shedaniel.clothconfig2.api.Modifier m =
+                            me.shedaniel.clothconfig2.api.Modifier.of(alt, ctrl, shift);
+                    boolean duplicate = false;
+                    for (me.shedaniel.clothconfig2.api.Modifier existing : out) {
+                        duplicate |= existing.getValue() == m.getValue();
+                    }
+                    if (!duplicate) {
+                        out.add(m);
+                    }
+                }
+            }
+        }
+        return out.toArray(new me.shedaniel.clothconfig2.api.Modifier[0]);
+    }
+
+    private static String modifierName(me.shedaniel.clothconfig2.api.Modifier modifier) {
+        if (modifier.isEmpty()) {
+            return "None";
+        }
+        List<String> parts = new ArrayList<>();
+        if (modifier.hasControl()) {
+            parts.add("Ctrl");
+        }
+        if (modifier.hasAlt()) {
+            parts.add("Alt");
+        }
+        if (modifier.hasShift()) {
+            parts.add("Shift");
+        }
+        return String.join(" + ", parts);
+    }
+
+    /** A Cloth ARGB colour as hex text; 6 digits when fully opaque, 8 otherwise. */
+    private static String hexOf(Number color) {
+        int argb = color.intValue();
+        return (argb >>> 24) == 0xFF
+                ? String.format("#%06X", argb & 0xFFFFFF)
+                : String.format("#%08X", argb);
+    }
+
+    /** Parses "#RRGGBB" (opaque) or "#AARRGGBB"; the hash is optional. */
+    private static java.util.OptionalInt parseHexColor(String text) {
+        String hex = text.trim();
+        if (hex.startsWith("#")) {
+            hex = hex.substring(1);
+        }
+        if (hex.length() != 6 && hex.length() != 8) {
+            return java.util.OptionalInt.empty();
+        }
+        try {
+            int value = (int) Long.parseLong(hex, 16);
+            return java.util.OptionalInt.of(hex.length() == 6 ? value | 0xFF000000 : value);
+        } catch (NumberFormatException e) {
+            return java.util.OptionalInt.empty();
+        }
     }
 
     /** Enum constants read better title-cased than SCREAMING_CASE. */

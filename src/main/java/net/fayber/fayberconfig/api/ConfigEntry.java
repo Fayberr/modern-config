@@ -4,12 +4,17 @@ import net.fayber.faybergui.render.Theme;
 import net.fayber.faybergui.render.Ui;
 import net.fayber.faybergui.widget.CycleButton;
 import net.fayber.faybergui.widget.FlatButton;
+import net.fayber.faybergui.widget.KeybindField;
 import net.fayber.faybergui.widget.PillToggle;
+import net.fayber.faybergui.widget.TextArea;
 import net.fayber.faybergui.widget.TextField;
 import net.fayber.fayberconfig.gui.ConfigEntryList;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -409,6 +414,117 @@ public interface ConfigEntry {
         public ConfigEntryList.Row createRow() {
             return new ConfigEntryList.WidgetRow(this.label, this.tooltip,
                     new CycleButton<>(0, 0, 20, this.getter, this.setter, this.values, this.namer));
+        }
+    }
+
+    /**
+     * Key bind field: a ghost button that shows the current bind and captures the next key press
+     * or mouse click when armed. Codes follow the toolkit's {@code KeybindField} convention:
+     * GLFW keycodes as-is, {@code 1000 + button} for mouse buttons.
+     */
+    final class Keybind implements ConfigEntry {
+        private final Component label;
+        private final IntSupplier getter;
+        private final IntConsumer setter;
+        private Component tooltip;
+        private Integer oldValue;
+
+        public Keybind(String label, IntSupplier getter, IntConsumer setter) {
+            this.label = Component.literal(label);
+            this.getter = getter;
+            this.setter = setter;
+        }
+
+        public Keybind tooltip(String tooltip) {
+            this.tooltip = Component.literal(tooltip);
+            return this;
+        }
+
+        @Override
+        public Component label() {
+            return this.label;
+        }
+
+        @Override
+        public Component tooltip() {
+            return this.tooltip;
+        }
+
+        @Override
+        public void snapshot() {
+            this.oldValue = this.getter.getAsInt();
+        }
+
+        @Override
+        public void restore() {
+            this.setter.accept(this.oldValue);
+        }
+
+        @Override
+        public ConfigEntryList.Row createRow() {
+            KeybindField field = new KeybindField(0, 0, FIELD_WIDTH, this.getter::getAsInt, this.setter::accept)
+                    .theme(THEME);
+            return new ConfigEntryList.WidgetRow(this.label, this.tooltip, field);
+        }
+    }
+
+    /**
+     * Multi-line string list editor: one item per line in a {@link TextArea}. The widget is as
+     * tall as the list needs (three lines minimum, eight maximum) and sits in a
+     * {@link ConfigEntryList.TallWidgetRow}; it scrolls internally beyond that. Item strings are
+     * not allowed to contain newlines by this representation.
+     */
+    final class StringList implements ConfigEntry {
+        private final Component label;
+        private final Supplier<List<String>> getter;
+        private final Consumer<List<String>> setter;
+        private Component tooltip;
+        private List<String> oldValue;
+
+        public StringList(String label, Supplier<List<String>> getter, Consumer<List<String>> setter) {
+            this.label = Component.literal(label);
+            this.getter = getter;
+            this.setter = setter;
+        }
+
+        public StringList tooltip(String tooltip) {
+            this.tooltip = Component.literal(tooltip);
+            return this;
+        }
+
+        @Override
+        public Component label() {
+            return this.label;
+        }
+
+        @Override
+        public Component tooltip() {
+            return this.tooltip;
+        }
+
+        @Override
+        public void snapshot() {
+            this.oldValue = List.copyOf(this.getter.get());
+        }
+
+        @Override
+        public void restore() {
+            this.setter.accept(this.oldValue);
+        }
+
+        @Override
+        public ConfigEntryList.Row createRow() {
+            // One line of headroom over the current item count so adding an item needs no resize;
+            // TextArea pads 8 on top and bottom.
+            int visibleLines = Math.clamp(this.getter.get().size() + 1, 3, 8);
+            int areaHeight = 2 * 8 + visibleLines * Ui.font().lineHeight;
+            TextArea area = new TextArea(0, 0, 100, areaHeight)
+                    .theme(THEME)
+                    .maxLength(4000)
+                    .value(String.join("\n", this.getter.get()))
+                    .onChanged(text -> this.setter.accept(
+                            new ArrayList<>(Arrays.asList(text.split("\n", -1)))));
+            return new ConfigEntryList.TallWidgetRow(this.label, this.tooltip, area);
         }
     }
 

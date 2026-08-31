@@ -276,6 +276,25 @@ public class FayberConfigScreen extends Screen {
         }
 
         /**
+         * A key bind: a ghost button showing the current bind that captures the next key press
+         * or mouse click when armed. Codes follow the toolkit convention: GLFW keycodes as-is,
+         * {@code 1000 + button} for mouse buttons.
+         */
+        public Builder keybind(String label, IntSupplier getter, IntConsumer setter) {
+            this.entries.add(new ConfigEntry.Keybind(label, getter, setter));
+            return this;
+        }
+
+        /**
+         * A list of strings edited one item per line in a multi-line text area. Item strings
+         * must not contain newlines.
+         */
+        public Builder stringList(String label, Supplier<List<String>> getter, Consumer<List<String>> setter) {
+            this.entries.add(new ConfigEntry.StringList(label, getter, setter));
+            return this;
+        }
+
+        /**
          * A small secondary action pinned to the bottom right corner of the window, outside the
          * card column and the Cancel/Save footer. Meant for escape hatches like the bridge's
          * "Use original menu", not for config options.

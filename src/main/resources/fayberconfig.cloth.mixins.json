@@ -8,6 +8,9 @@
 		"ConfigBuilderImplMixin",
 		"FieldBuilderMixin",
 		"RangeFieldBuilderAccessor",
+		"KeyCodeBuilderAccessor",
+		"DropdownMenuBuilderAccessor",
+		"SelectionListEntryAccessor",
 		"ClothScreenButtonMixin",
 		"GlobalizedClothScreenButtonMixin"
 	],
