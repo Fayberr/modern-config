@@ -1,6 +1,7 @@
 package net.fayber.fayberconfig.api;
 
 import net.fayber.fayberconfig.gui.ConfigEntryList;
+import net.fayber.fayberconfig.gui.CycleButtonWidget;
 import net.fayber.fayberconfig.gui.DoubleSliderWidget;
 import net.fayber.fayberconfig.gui.FlatButton;
 import net.fayber.fayberconfig.gui.FloatSliderWidget;
@@ -13,6 +14,7 @@ import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
 
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
@@ -338,6 +340,57 @@ public interface ConfigEntry {
             box.setValue(this.getter.get());
             box.setResponder(this.setter::accept);
             return new ConfigEntryList.WidgetRow(this.label, this.tooltip, box);
+        }
+    }
+
+    /** Fixed set of values stepped through with a cycle button (enums, modes, ...). */
+    final class Cycle<T> implements ConfigEntry {
+        private final Component label;
+        private final Supplier<T> getter;
+        private final Consumer<T> setter;
+        private final T[] values;
+        private final Function<T, String> namer;
+        private Component tooltip;
+        private T oldValue;
+
+        public Cycle(String label, Supplier<T> getter, Consumer<T> setter, T[] values,
+                     Function<T, String> namer) {
+            this.label = Component.literal(label);
+            this.getter = getter;
+            this.setter = setter;
+            this.values = values;
+            this.namer = namer;
+        }
+
+        public Cycle<T> tooltip(String tooltip) {
+            this.tooltip = Component.literal(tooltip);
+            return this;
+        }
+
+        @Override
+        public Component label() {
+            return this.label;
+        }
+
+        @Override
+        public Component tooltip() {
+            return this.tooltip;
+        }
+
+        @Override
+        public void snapshot() {
+            this.oldValue = this.getter.get();
+        }
+
+        @Override
+        public void restore() {
+            this.setter.accept(this.oldValue);
+        }
+
+        @Override
+        public ConfigEntryList.Row createRow() {
+            return new ConfigEntryList.WidgetRow(this.label, this.tooltip,
+                    new CycleButtonWidget<>(0, 0, 20, this.getter, this.setter, this.values, this.namer));
         }
     }
 

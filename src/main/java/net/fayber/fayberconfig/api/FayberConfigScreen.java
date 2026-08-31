@@ -11,6 +11,7 @@ import net.minecraft.network.chat.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
@@ -214,6 +215,17 @@ public class FayberConfigScreen extends Screen {
 
         public Builder text(String label, Supplier<String> getter, Consumer<String> setter, int maxLength) {
             this.entries.add(new ConfigEntry.Text(label, getter, setter, maxLength));
+            return this;
+        }
+
+        /**
+         * An option with a fixed set of values, shown as a cycle card that steps through them on
+         * click (left forward, right backward). Typical for enums; {@code namer} turns a value
+         * into its display text.
+         */
+        public <T> Builder cycle(String label, Supplier<T> getter, Consumer<T> setter, T[] values,
+                                 Function<T, String> namer) {
+            this.entries.add(new ConfigEntry.Cycle<>(label, getter, setter, values, namer));
             return this;
         }
 
