@@ -93,6 +93,18 @@ public class ConfigEntryList extends ContainerObjectSelectionList<ConfigEntryLis
     }
 
     /**
+     * GUI pixels per wheel notch. Vanilla's own rate is {@code entryHeight / 2} (bytecode-verified:
+     * the list constructor passes that to the scrollbar settings), half a row, which reads as
+     * sluggish on a sparse config screen. Two rows per notch feels like a modern app, and because
+     * the wheel only moves the animation target, fast multi-notch spins still glide instead of
+     * jumping.
+     */
+    @Override
+    protected double scrollRate() {
+        return 2.0 * ROW_HEIGHT;
+    }
+
+    /**
      * Every scroll change that is not ours (scrollbar drag, keyboard, scrollToEntry) is
      * authoritative: snap the animation state to it and apply it instantly.
      */
