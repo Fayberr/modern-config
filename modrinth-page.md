@@ -44,6 +44,7 @@ ModernConfigScreen.builder(title, parent, onSave)
 ```
 
 - Colors, cycles, dropdowns, keybinds, string and number lists, text fields, notes and corner buttons are also in the builder. Optional default values add reset-to-default buttons.
+- Decorate the option added just before: `.tooltip(...)` for hover help, `.requiresRestart()` for a Restart badge, `.enabledWhen(condition)` to grey the row out and ignore its input while a condition is false, and `.error(supplier)` for a red border and a message in the tooltip while validation fails.
 - Setters run on every input, so changes preview live while the screen is open. Options snapshot when the screen opens; Cancel or ESC restores them, and Save runs your onSave.
 - Existing builder calls keep working across all 1.x releases; new options arrive as additional methods.
 - Add it as an optional, compileOnly dependency (`"net.fayber:modern-config"` from `mavenLocal()` today, `maven.modrinth:modern-config` from the Modrinth maven once approved) and never bundle the jar. Requires the Modern GUI library as a separate dependency at runtime; the only other dependency is Fabric API.

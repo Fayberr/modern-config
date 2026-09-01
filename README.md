@@ -22,9 +22,9 @@ repositories {
 
 dependencies {
     // compileOnly: your mod compiles against the API without shipping it
-    compileOnly "net.fayber:modern-config:1.7.1"
+    compileOnly "net.fayber:modern-config:1.8.0"
     // runtimeOnly pulls it into the dev client, so the integration is exercised on every boot
-    runtimeOnly "net.fayber:modern-config:1.7.1"
+    runtimeOnly "net.fayber:modern-config:1.8.0"
 }
 ```
 
@@ -65,6 +65,15 @@ action to the bottom right of the window, and `tooltip(...)` attaches to the opt
 before it. Overloads that take a default value add a reset button to the card while the current
 value differs from that default. `ModernConfigScreen.Builder` in the source lists every method
 with its javadoc.
+
+Four fluent calls attach to the option added just before them: `tooltip(...)`, plus three
+per-option states. `requiresRestart()` shows a Restart badge on the card (the setter still
+writes through live; the badge only tells the player a restart is needed to apply it).
+`enabledWhen(condition)` greys the row out and ignores its input while the condition is false,
+which is how dependent options read ("Beam Width" only while the beam is enabled); the
+condition is re-checked every frame and may read other options' getters. `error(supplier)`
+turns the card border red and shows the message in the option's tooltip while the supplier
+returns one, and falls back to the entry's own tooltip when it does not.
 
 The behavior contract, which is the point:
 

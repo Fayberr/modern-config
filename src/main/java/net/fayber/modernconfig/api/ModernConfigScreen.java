@@ -14,6 +14,7 @@ import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
@@ -35,9 +36,10 @@ import org.jetbrains.annotations.Nullable;
  * {@code onSave} (which persists the config) and returns to the parent screen.
  *
  * <p>Build one through {@link #builder}: optionally tabs ({@code .tab(...)}), then categories
- * and entries; {@code .tooltip(...)} attaches to the entry added just before it. A screen with
- * tabs shows one tab's entries at a time in the scrolling column, like the tab strip Cloth
- * Config draws for multi-category configs.
+ * and entries; {@code .tooltip(...)} attaches to the entry added just before it, and so do the
+ * per-option decorations ({@code .requiresRestart()}, {@code .enabledWhen(...)},
+ * {@code .error(...)}). A screen with tabs shows one tab's entries at a time in the scrolling
+ * column, like the tab strip Cloth Config draws for multi-category configs.
  *
  * <p>Layout is done by hand rather than with {@code HeaderAndFooterLayout} because everything has
  * to line up with the centred column, not the window: the list is positioned explicitly with
@@ -65,6 +67,8 @@ public class ModernConfigScreen extends Screen {
     @Nullable
     private final Runnable onSave;
     private final List<ConfigEntry> entries;
+    /** Parallel to entries: the Builder's per-option decorations (restart badge, condition, error). */
+    private final List<ConfigEntryList.OptionState> optionStates;
     /** Tab labels, in order; empty when the screen has no tabs and one flat list. */
     private final List<String> tabLabels;
     /** Parallel to entries: the tab index each entry belongs to, or -1 for always visible. */
@@ -98,13 +102,15 @@ public class ModernConfigScreen extends Screen {
     private int titleY;
 
     ModernConfigScreen(Component title, @Nullable Screen parent, @Nullable Runnable onSave,
-                       List<ConfigEntry> entries, @Nullable CornerButton cornerButton,
+                       List<ConfigEntry> entries, List<ConfigEntryList.OptionState> optionStates,
+                       @Nullable CornerButton cornerButton,
                        List<String> tabLabels, List<Integer> tabOfEntries) {
         // Kept raw: the Inter variant depends on the GUI scale, so it is applied at draw time.
         super(title);
         this.parent = parent;
         this.onSave = onSave;
         this.entries = entries;
+        this.optionStates = optionStates;
         this.cornerButton = cornerButton;
         this.tabLabels = tabLabels;
         this.tabOfEntries = tabOfEntries;
@@ -147,8 +153,10 @@ public class ModernConfigScreen extends Screen {
         this.columnX = (this.width - this.columnW) / 2;
 
         List<ConfigEntryList.Row> rows = new ArrayList<>();
-        for (ConfigEntry entry : this.entries) {
-            rows.add(entry.createRow());
+        for (int i = 0; i < this.entries.size(); i++) {
+            ConfigEntryList.Row row = this.entries.get(i).createRow();
+            row.optionState(this.optionStates.get(i));
+            rows.add(row);
         }
         this.rows = rows;
 
@@ -306,6 +314,8 @@ public class ModernConfigScreen extends Screen {
         @Nullable
         private final Runnable onSave;
         private final List<ConfigEntry> entries = new ArrayList<>();
+        /** Parallel to entries: decorations attached to each one, DEFAULT until one is touched. */
+        private final List<ConfigEntryList.OptionState> states = new ArrayList<>();
         private final List<String> tabs = new ArrayList<>();
         /** Parallel to entries: the tab each entry was added under, or -1 before the first tab. */
         private final List<Integer> tabOfEntries = new ArrayList<>();
@@ -330,7 +340,60 @@ public class ModernConfigScreen extends Screen {
         private <E extends ConfigEntry> E addEntry(E entry) {
             this.tabOfEntries.add(this.currentTab);
             this.entries.add(entry);
+            this.states.add(ConfigEntryList.OptionState.DEFAULT);
             return entry;
+        }
+
+        /**
+         * Replaces the most recently added entry's state, like {@link #tooltip} attaches to the
+         * entry added just before the call. Decoration calls before any entry are a no-op.
+         */
+        private Builder decorate(ConfigEntryList.OptionState state) {
+            int last = this.states.size() - 1;
+            if (last >= 0) {
+                this.states.set(last, state);
+            }
+            return this;
+        }
+
+        /**
+         * Marks the option added just before this call as needing a restart for its change to
+         * take effect; its card shows a Restart badge. The setter still writes through live.
+         */
+        public Builder requiresRestart() {
+            ConfigEntryList.OptionState current = this.lastState();
+            return this.decorate(new ConfigEntryList.OptionState(true,
+                    current == null ? null : current.condition(),
+                    current == null ? null : current.errorSupplier()));
+        }
+
+        /**
+         * Disables the option added just before this call while the condition is false: its row
+         * renders dimmed and ignores input, but stays in place and keeps its value. Re-checked
+         * every frame, so the condition can read other options' getters.
+         */
+        public Builder enabledWhen(BooleanSupplier condition) {
+            ConfigEntryList.OptionState current = this.lastState();
+            return this.decorate(new ConfigEntryList.OptionState(
+                    current != null && current.restart(), condition,
+                    current == null ? null : current.errorSupplier()));
+        }
+
+        /**
+         * Attaches an error to the option added just before this call: while the supplier
+         * returns a message, the card border turns red and the message replaces the tooltip.
+         * Null or empty means no error. Re-evaluated every frame.
+         */
+        public Builder error(Supplier<@Nullable String> errorSupplier) {
+            ConfigEntryList.OptionState current = this.lastState();
+            return this.decorate(new ConfigEntryList.OptionState(
+                    current != null && current.restart(), current == null ? null : current.condition(),
+                    errorSupplier));
+        }
+
+        @Nullable
+        private ConfigEntryList.OptionState lastState() {
+            return this.states.isEmpty() ? null : this.states.get(this.states.size() - 1);
         }
 
         /** Starts a new category section (inserts a header row). */
@@ -573,7 +636,7 @@ public class ModernConfigScreen extends Screen {
 
         public ModernConfigScreen build() {
             return new ModernConfigScreen(this.title, this.parent, this.onSave,
-                    List.copyOf(this.entries), this.cornerButton,
+                    List.copyOf(this.entries), List.copyOf(this.states), this.cornerButton,
                     List.copyOf(this.tabs), List.copyOf(this.tabOfEntries));
         }
     }
