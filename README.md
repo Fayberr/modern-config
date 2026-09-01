@@ -22,9 +22,9 @@ repositories {
 
 dependencies {
     // compileOnly: your mod compiles against the API without shipping it
-    compileOnly "net.fayber:modern-config:1.9.0"
+    compileOnly "net.fayber:modern-config:1.9.1"
     // runtimeOnly pulls it into the dev client, so the integration is exercised on every boot
-    runtimeOnly "net.fayber:modern-config:1.9.0"
+    runtimeOnly "net.fayber:modern-config:1.9.1"
 }
 ```
 
