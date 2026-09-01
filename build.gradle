@@ -28,10 +28,9 @@ dependencies {
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 
 	// The GUI toolkit (widgets, Theme, CardList, Ui). Published to mavenLocal by the Fayber GUI
-	// project; `include` nests the jar inside this one (jar-in-jar) so consumers only install
-	// fayber-config. 26.1 is obfuscation-free, so no remapping is involved.
+	// project. Not bundled: fayber-gui is a declared dependency (fabric.mod.json depends), so one
+	// standalone copy serves every consumer. 26.1 is obfuscation-free, so no remapping is involved.
 	implementation "net.fayber:fayber-gui:${project.fayber_gui_version}"
-	include "net.fayber:fayber-gui:${project.fayber_gui_version}"
 
 	// Cloth Config: compile against it for the bridge mixins, never ship or require it.
 	compileOnly("me.shedaniel.cloth:cloth-config-fabric:${project.cloth_config_version}") {

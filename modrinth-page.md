@@ -33,5 +33,5 @@ When Cloth Config is installed, its screens are translated into the same look in
 ## For mod developers
 
 - Builder API: `FayberConfigScreen.builder()` with tabs, category headers, booleans, int, float and double sliders, text fields, cycles, buttons, keybinds, string lists, notes and corner buttons.
-- Embeds the Fayber GUI library via jar-in-jar; the only other dependency is Fabric API.
+- Requires the Fayber GUI library as a separate dependency; the only other dependency is Fabric API.
 - GPL-3.0-or-later.

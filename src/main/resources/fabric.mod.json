@@ -28,7 +28,7 @@
 		"minecraft": ">=26.1 <26.2",
 		"java": ">=25",
 		"fabric-api": "*",
-		"faybergui": ">=${fayber_gui_version}"
+		"faybergui": ">=${fayber_gui_version} <1.1"
 	},
 	"breaks": {
 		"cloth-config": "<26.1.154"
