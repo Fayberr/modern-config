@@ -89,8 +89,6 @@ public interface ConfigEntry {
         return new ConfigEntryList.Reset(button, () -> !Objects.equals(currentValue.get(), defaultValue));
     }
 
-    // ------------------------------------------------------------------ colour text helpers
-
     /** Hex text shape accepted by {@link Color}: an optional hash, then up to 8 hex digits. */
     Predicate<String> COLOR_TEXT = s -> s.matches("#?[0-9a-fA-F]{0,8}");
 

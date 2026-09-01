@@ -114,7 +114,6 @@ public final class ClothBridge {
                 return null;
             }
 
-            // Edits live here until Save; Cloth's consumers only run then.
             Map<Object, Object> staged = new java.util.HashMap<>();
             List<Runnable> onSave = new ArrayList<>();
 
@@ -273,11 +272,9 @@ public final class ClothBridge {
             return null;
         }
 
-        // Static text: a paragraph with no value. Cloth's startTextDescription mints a random
-        // UUID as field name for every description (the only randomUUID in
-        // ConfigEntryBuilderImpl) and the real text sits in a private field, so the note is
-        // pulled out through an accessor mixin and rendered as wrapped secondary text. Entries
-        // with no text are skipped entirely rather than leaking a UUID header.
+        // Static text: startTextDescription names every entry with a random UUID (see
+        // TextListEntryAccessor) and the real text sits in a private field. Empty entries are
+        // skipped so a UUID never leaks out as a header.
         if (entry instanceof TextListEntry textEntry) {
             Component text = ((TextListEntryAccessor) (Object) textEntry).fayberconfig$text();
             if (text != null && !text.getString().isBlank()) {
@@ -286,7 +283,7 @@ public final class ClothBridge {
             return null;
         }
 
-        // A pure spacer row: nothing to show, nothing to save, so nothing is added.
+        // Spacer row, nothing to translate.
         if (entry instanceof EmptyEntry) {
             return null;
         }
@@ -313,8 +310,7 @@ public final class ClothBridge {
             }
             me.shedaniel.clothconfig2.api.ModifierKeyCode defaultBind =
                     defaultOf(e) instanceof me.shedaniel.clothconfig2.api.ModifierKeyCode declared ? declared : null;
-            // The bind is staged as a ModifierKeyCode copy so a key edit never clobbers the
-            // modifier and vice versa; both rows read the same staged object.
+            // Staged as a ModifierKeyCode copy so the key and modifier rows never clobber each other.
             builder.keybind(label,
                     () -> keyCodeOf(currentBind(staged, e, bind)),
                     code -> stageKeyCode(staged, e, currentBind(staged, e, bind), code,
@@ -357,8 +353,7 @@ public final class ClothBridge {
             int min = intOf(plumbing.min(), Integer.MIN_VALUE);
             int max = intOf(plumbing.max(), Integer.MAX_VALUE);
             if (min == Integer.MIN_VALUE || max == Integer.MAX_VALUE) {
-                // Unbounded: a slider would be meaningless, so show it as a text field. Values are
-                // only staged while the text parses, so half-typed states never reach Save.
+                // Unbounded: a slider would be meaningless, so this falls back to a text field.
                 builder.text(label, () -> String.valueOf(current(staged, e, e.getValue())),
                         v -> parseInt(v).ifPresent(i -> staged.put(e, i)), 12, INT_LIKE,
                         asString(defaultOf(e)));
@@ -421,10 +416,8 @@ public final class ClothBridge {
             // number lists, parsed to Long so the erased Cloth consumer receives its type.
             addLinesList(builder, label, e, staged, ClothBridge::boxedLong);
         } else if (entry instanceof EnumListEntry<?> e) {
-            // Only EnumListEntry, not its SelectionListEntry parent: Cloth fills an enum entry with
-            // every constant of the type, but a plain SelectionListEntry may hold an arbitrary
-            // subset that the entry does not expose, and offering the full enum there would let the
-            // user pick values the mod never allowed.
+            // Checked before the SelectionListEntry parent: only an enum entry is guaranteed to
+            // hold every constant of its type, a plain selector may expose an arbitrary subset.
             Object value = e.getValue();
             if (value == null) {
                 return "'" + label + "' (enum) has no value";
@@ -451,10 +444,9 @@ public final class ClothBridge {
             }
             addCycle(builder, label, e, selections.toArray(), staged);
         } else {
-            // Any kind not understood above (a third-party AbstractConfigListEntry subclass, or
-            // a kind from a future Cloth version): not translated, so the whole screen stays
-            // Cloth's (logged above). NestedListListEntry also lands here via the plumbing check:
-            // no Cloth builder constructs it, so no save consumer is ever captured for it.
+            // Third-party entry kind, a future Cloth version, or NestedListListEntry (no Cloth
+            // builder constructs it, so it never gets a save consumer either way).
+            // TODO: nested lists have no Fayber equivalent, this always refuses the whole screen.
             return "'" + label + "' is a " + kindOf(entry) + ", which is not supported";
         }
 
@@ -629,14 +621,14 @@ public final class ClothBridge {
         if (key == null) {
             return -1;
         }
-        // Scan codes have no faithful int form in the toolkit's convention; they show as
-        // unbound and rebinding writes a keysym, which is what mods persist anyway.
         if (key.getType() == com.mojang.blaze3d.platform.InputConstants.Type.MOUSE) {
             return net.fayber.faybergui.widget.KeybindField.MOUSE_CODE_BASE + key.getValue();
         }
         if (key.getType() == com.mojang.blaze3d.platform.InputConstants.Type.KEYSYM) {
             return key.getValue();
         }
+        // Scan codes have no faithful int form in the toolkit's convention: shows as unbound,
+        // and rebinding writes a keysym instead, which is what mods persist anyway.
         return -1;
     }
 
@@ -646,7 +638,6 @@ public final class ClothBridge {
                                      boolean allowKey, boolean allowMouse) {
         boolean mouse = code >= net.fayber.faybergui.widget.KeybindField.MOUSE_CODE_BASE;
         if (mouse ? !allowMouse : !allowKey) {
-            // Cloth would not accept this kind of input for this entry; keep the old bind.
             return;
         }
         var key = mouse

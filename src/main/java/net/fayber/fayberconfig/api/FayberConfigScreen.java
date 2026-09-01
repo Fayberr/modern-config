@@ -152,10 +152,8 @@ public class FayberConfigScreen extends Screen {
         }
         this.rows = rows;
 
-        // Dropdown rows get the popup host so their menus float above every card: without a
-        // host the menu is drawn inline during this row's extraction and every later row's card
-        // paints over it. The host itself is added as a widget further down, after everything
-        // else, so its extraction (and therefore drawing) happens last.
+        // Dropdown rows get the popup host so their menus float above every card, otherwise a
+        // later row's card paints over an open menu drawn during this row's extraction.
         this.popupHost = new PopupHost(0, 0, this.width, this.height).theme(this.theme);
         for (ConfigEntryList.Row row : rows) {
             Dropdown dropdown = row.dropdown();
@@ -184,9 +182,7 @@ public class FayberConfigScreen extends Screen {
                 this.addRenderableWidget(tabs);
             } else {
                 // More tabs than the column fits (Cloth configs love seven categories): the bar
-                // gets its own clipped, wheel-scrollable strip whose scrollbar sits just under
-                // the underline. Picking a tab scrolls the strip minimally so the whole selected
-                // tab is in view (the far-right one would otherwise stay clipped).
+                // gets its own clipped, wheel-scrollable strip, and picking a tab scrolls it into view.
                 HorizontalScrollPanel panel =
                         new HorizontalScrollPanel(this.columnX, tabsY, this.columnW, Tabs.HEIGHT + 6);
                 panel.add(tabs);
