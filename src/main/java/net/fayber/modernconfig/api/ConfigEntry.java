@@ -1103,6 +1103,7 @@ public interface ConfigEntry {
         public ConfigEntryList.Row createRow() {
             ListEditor editor = new ListEditor(0, 0, 100, List.copyOf(this.getter.get()))
                     .theme(THEME)
+                    .fieldHint("text")
                     .onChanged(lines -> {
                         List<String> parsed = parseLineList(lines, Function.identity());
                         if (parsed != null) {
@@ -1185,6 +1186,7 @@ public interface ConfigEntry {
         public ConfigEntryList.Row createRow() {
             ListEditor editor = new ListEditor(0, 0, 100, linesOf(this.getter.get()))
                     .theme(THEME)
+                    .fieldHint("80")
                     .lineValidator(s -> parseIntOrNull(s) != null)
                     .onChanged(lines -> {
                         List<Integer> parsed = parseLineList(lines, ConfigEntry::parseIntOrNull);
@@ -1264,6 +1266,7 @@ public interface ConfigEntry {
         public ConfigEntryList.Row createRow() {
             ListEditor editor = new ListEditor(0, 0, 100, linesOf(this.getter.get()))
                     .theme(THEME)
+                    .fieldHint("0.5")
                     .lineValidator(s -> parseFloatOrNull(s) != null)
                     .onChanged(lines -> {
                         List<Float> parsed = parseLineList(lines, ConfigEntry::parseFloatOrNull);
@@ -1343,6 +1346,7 @@ public interface ConfigEntry {
         public ConfigEntryList.Row createRow() {
             ListEditor editor = new ListEditor(0, 0, 100, linesOf(this.getter.get()))
                     .theme(THEME)
+                    .fieldHint("0.25")
                     .lineValidator(s -> parseDoubleOrNull(s) != null)
                     .onChanged(lines -> {
                         List<Double> parsed = parseLineList(lines, ConfigEntry::parseDoubleOrNull);
