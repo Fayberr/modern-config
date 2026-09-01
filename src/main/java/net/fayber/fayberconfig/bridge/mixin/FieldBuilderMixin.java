@@ -14,15 +14,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.function.Consumer;
 
 /**
- * Captures the value plumbing of every Cloth entry as it is built.
- *
- * <p>{@code FieldBuilder.finishBuilding} is the single point every Cloth entry builder passes
- * through on its way out of {@code build()}, so one injection covers all entry kinds, present and
- * future, instead of one mixin per builder class.
- *
- * <p>What is captured is exactly what the finished entry no longer exposes: the save consumer
- * (public on the builder, private on the entry) and the range bounds (held by the builder for
- * sliders and number fields). See {@link ClothBridge} for how they are used.
+ * Captures the value plumbing of every Cloth entry as it is built. finishBuilding is the one
+ * point every entry builder passes through, so a single injection covers all entry kinds.
+ * Captured is exactly what the finished entry no longer exposes: the save consumer (public on
+ * the builder, private on the entry) and the range bounds. See {@link ClothBridge}.
  */
 @Mixin(FieldBuilder.class)
 public abstract class FieldBuilderMixin {
@@ -42,10 +37,8 @@ public abstract class FieldBuilderMixin {
             if ((Object) this instanceof AbstractFieldBuilder<?, ?, ?> fieldBuilder) {
                 saveConsumer = (Consumer<Object>) fieldBuilder.getSaveConsumer();
             } else if ((Object) this instanceof KeyCodeBuilderAccessor keyCodeBuilder) {
-                // KeyCodeBuilder and DropdownMenuBuilder extend FieldBuilder directly and keep
-                // their save consumer in their own field, invisible to the AbstractFieldBuilder
-                // read above. Without these branches every key bind and dropdown entry was
-                // recorded with a null consumer and refused at translation time.
+                // KeyCodeBuilder and DropdownMenuBuilder keep their save consumer in their own
+                // field, invisible to the AbstractFieldBuilder read above.
                 saveConsumer = (Consumer<Object>) keyCodeBuilder.fayberconfig$saveConsumer();
             } else if ((Object) this instanceof DropdownMenuBuilderAccessor dropdownBuilder) {
                 saveConsumer = (Consumer<Object>) dropdownBuilder.fayberconfig$saveConsumer();
@@ -58,7 +51,7 @@ public abstract class FieldBuilderMixin {
             }
             ClothBridge.PLUMBING.put(built, new EntryPlumbing(saveConsumer, min, max));
         } catch (Throwable t) {
-            // A screen with missing plumbing simply is not translated; never break Cloth itself.
+            // Missing plumbing means the entry is not translated; never break Cloth itself.
             ClothBridge.LOGGER.debug("Could not capture entry plumbing", t);
         }
     }

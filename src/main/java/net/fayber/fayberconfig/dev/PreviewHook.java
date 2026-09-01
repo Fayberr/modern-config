@@ -10,14 +10,11 @@ import java.util.List;
 import java.util.function.Function;
 
 /**
- * Design workbench. Opens a demo config screen automatically shortly after the dev client reaches
- * the title screen, so the look can be iterated on headlessly: run the client under Xvfb, grab a
- * frame, inspect the pixels, repeat (see {@code tools/preview.sh}).
- *
- * <p>Completely inert unless the JVM is started with {@code -Dfayberconfig.preview=true}, so this
- * class costs shipped builds one boolean check at init. The same demo screen is reachable in any
- * install through the {@code /fayberconfig demo} command, which is how users exercise every
- * entry type (and the reset-to-default buttons) on a real instance.
+ * Design workbench. Opens a demo config screen shortly after the dev client reaches the title
+ * screen, so the look can be iterated on headlessly: run the client under Xvfb, grab a frame,
+ * inspect, repeat (see {@code tools/preview.sh}). Inert unless the JVM is started with
+ * {@code -Dfayberconfig.preview=true}. The same demo screen is reachable in any install via
+ * {@code /fayberconfig demo}.
  */
 public final class PreviewHook {
     /** Sort options for the dropdown demo, in menu order. */
@@ -32,9 +29,8 @@ public final class PreviewHook {
 
     public static void register() {
         FayberConfigClient.LOGGER.info("Fayber Config preview hook armed");
-        // Optional scroll-offset support: -Dfayberconfig.previewScroll=<px> settles the demo
-        // list at that scroll offset one second after the screen opens, so captures can check
-        // sub-pixel rendering without timing races.
+        // -Dfayberconfig.previewScroll=<px> settles the demo list at that offset one second
+        // after the screen opens, so captures can check rendering without timing races.
         double scrollTarget = 0.0;
         String scrollProp = System.getProperty("fayberconfig.previewScroll");
         if (scrollProp != null) {

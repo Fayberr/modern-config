@@ -12,11 +12,11 @@ import org.slf4j.LoggerFactory;
 /**
  * Fayber Config: slim, modern config screens for Fayber's mods.
  *
- * <p>Consumer mods add this as an OPTIONAL dependency (never a hard one): they check
+ * <p>Consumer mods add this as an optional dependency, check
  * {@code FabricLoader.getInstance().isModLoaded("fayberconfig")} at runtime and build a
  * {@link net.fayber.fayberconfig.api.FayberConfigScreen} through
  * {@link net.fayber.fayberconfig.api.FayberConfigScreen#builder}. When the mod is absent they
- * fall back to whatever they used before (Cloth Config, a vanilla screen, or nothing).
+ * fall back to whatever they used before.
  */
 public class FayberConfigClient implements ClientModInitializer {
     public static final String MOD_ID = "fayberconfig";
@@ -36,8 +36,8 @@ public class FayberConfigClient implements ClientModInitializer {
 
     /**
      * {@code /fayberconfig demo}: opens the demo screen with one of every entry type, the same
-     * screen the dev preview hook auto-opens. A support and showcase surface: it exercises the
-     * whole builder API (and every reset-to-default button) without needing a mod that uses it.
+     * screen the dev preview hook auto-opens. Exercises the whole builder API without needing
+     * a mod that uses it.
      */
     private static void registerCommands() {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->

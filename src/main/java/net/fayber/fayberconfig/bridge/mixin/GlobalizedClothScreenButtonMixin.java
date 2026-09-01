@@ -9,9 +9,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * The globalized variant of the reverse button; see {@link ClothScreenButtonMixin}. Cloth's
- * {@code build()} returns this screen when the builder was marked globalized, and it is a sibling
- * of {@code ClothConfigScreen}, not a subclass, so it needs its own injection.
+ * Same button as {@link ClothScreenButtonMixin}, but for the globalized screen, which is a
+ * sibling of ClothConfigScreen and not a subclass, so it needs its own mixin.
  */
 @Mixin(GlobalizedClothConfigScreen.class)
 public abstract class GlobalizedClothScreenButtonMixin {

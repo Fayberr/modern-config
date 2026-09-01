@@ -287,7 +287,7 @@ public class FayberConfigScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
-        // Backdrop and title must be extracted BEFORE super (which extracts the widgets), because
+        // Backdrop and title must be extracted before super (which extracts the widgets), because
         // within one stratum extraction order is draw order.
         gfx.fill(0, 0, this.width, this.height, this.theme.scrim);
 
@@ -353,8 +353,8 @@ public class FayberConfigScreen extends Screen {
         }
 
         /**
-         * Attaches a tooltip to the most recently added entry. Kept as a separate builder step
-         * so entry methods can return the Builder and chain fluently.
+         * Attaches a tooltip to the most recently added entry, a separate step so entry methods
+         * can return the Builder and chain fluently.
          */
         public Builder tooltip(String tooltip) {
             if (!this.entries.isEmpty()) {
@@ -471,9 +471,8 @@ public class FayberConfigScreen extends Screen {
         }
 
         /**
-         * An option with a fixed set of values, shown as a dropdown that opens a menu on click:
-         * the other presentation for enums and modes, next to {@link #cycle}. Reads better for
-         * long value lists; cycles read better for two to four options.
+         * An option with a fixed set of values, shown as a dropdown that opens a menu on click,
+         * the other presentation next to {@link #cycle}. Reads better for long value lists.
          */
         public <T> Builder select(String label, Supplier<T> getter, Consumer<T> setter, T[] values,
                                   Function<T, String> namer) {
@@ -569,8 +568,7 @@ public class FayberConfigScreen extends Screen {
 
         /**
          * A small secondary action pinned to the bottom right corner of the window, outside the
-         * card column and the Cancel/Save footer. Meant for escape hatches like the bridge's
-         * "Use original menu", not for config options.
+         * card column and the Cancel/Save footer. Meant for escape hatches, not config options.
          */
         public Builder cornerButton(String label, Runnable onPress) {
             this.cornerButton = new CornerButton(label, onPress);

@@ -17,12 +17,10 @@ import java.util.Map;
 /**
  * Swaps a finished Cloth screen for a Fayber Config screen.
  *
- * <p>Injected at {@code RETURN} rather than {@code HEAD} on purpose: letting Cloth build its screen
- * first costs one screen construction but means the original is available as a fallback (the
- * "Use original menu" button) and that a failed translation can return it untouched.
- *
- * <p>{@code ConfigBuilder} itself is an interface whose {@code build()} is abstract, so the mixin
- * targets the concrete {@code ConfigBuilderImpl}.
+ * <p>Injected at RETURN rather than HEAD: letting Cloth build its screen first costs one
+ * construction but keeps the original as a fallback (the "Use original menu" button), and a
+ * failed translation can return it untouched. The mixin targets the concrete
+ * ConfigBuilderImpl because ConfigBuilder is an interface.
  */
 @Mixin(ConfigBuilderImpl.class)
 public abstract class ConfigBuilderImplMixin {

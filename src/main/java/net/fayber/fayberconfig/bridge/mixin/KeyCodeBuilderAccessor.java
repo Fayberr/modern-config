@@ -7,10 +7,8 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 import java.util.function.Consumer;
 
 /**
- * KeyCodeBuilder extends {@code FieldBuilder} directly, not {@code AbstractFieldBuilder}, so the
- * plumbing capture (which reads the save consumer off {@code AbstractFieldBuilder}) misses it:
- * the consumer lives in this class's own field. Same trap as DropdownMenuBuilder, see
- * {@link DropdownMenuBuilderAccessor}.
+ * KeyCodeBuilder extends FieldBuilder directly, so the plumbing capture misses its save
+ * consumer. Same trap as DropdownMenuBuilder, see {@link DropdownMenuBuilderAccessor}.
  */
 @Mixin(KeyCodeBuilder.class)
 public interface KeyCodeBuilderAccessor {

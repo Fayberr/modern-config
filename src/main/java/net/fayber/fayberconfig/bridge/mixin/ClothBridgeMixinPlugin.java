@@ -9,10 +9,8 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Applies the Cloth bridge mixins only when Cloth Config is actually installed.
- *
- * <p>Without this the mixins would target classes that do not exist and the game would crash on
- * startup for anyone running Fayber Config without Cloth, which is the normal case.
+ * Applies the Cloth bridge mixins only when Cloth Config is installed, otherwise they would
+ * target missing classes and crash the game. Running without Cloth is the normal case.
  */
 public class ClothBridgeMixinPlugin implements IMixinConfigPlugin {
     private static final String CLOTH_MOD_ID = "cloth-config";

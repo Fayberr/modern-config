@@ -27,6 +27,7 @@ import me.shedaniel.clothconfig2.gui.entries.TextListEntry;
 import me.shedaniel.clothconfig2.gui.entries.TooltipListEntry;
 import net.fayber.faybergui.render.Theme;
 import net.fayber.faybergui.widget.FlatButton;
+import net.fayber.fayberconfig.api.ConfigEntry;
 import net.fayber.fayberconfig.api.FayberConfigScreen;
 import net.fayber.fayberconfig.bridge.mixin.MultiElementListEntryAccessor;
 import net.fayber.fayberconfig.bridge.mixin.SelectionListEntryAccessor;
@@ -77,9 +78,8 @@ public final class ClothBridge {
 
     /**
      * Every modifier combination a Cloth key bind can carry, for the modifier cycle. The order
-     * of {@code Modifier.of}'s three booleans is not documented, so each combination is deduped
-     * by its bit value and named by probing {@code hasControl}/{@code hasAlt}/{@code hasShift};
-     * that also keeps the cycle's {@code equals} matching working against Cloth's own instances.
+     * of {@code Modifier.of}'s three booleans is not documented, so combinations are deduped by
+     * bit value; that also keeps the cycle's {@code equals} matching Cloth's own instances.
      */
     private static final me.shedaniel.clothconfig2.api.Modifier[] MODIFIER_COMBOS = buildModifierCombos();
 
@@ -167,8 +167,7 @@ public final class ClothBridge {
 
     /**
      * Logs why a screen stays on Cloth and returns null (the caller's translation abort). One
-     * INFO line per refused screen: refusals used to be silent, which is how "most mods just
-     * show the Cloth menu" went undiagnosed until the mod jars were pulled and scanned.
+     * INFO line per refused screen: silent refusals once went undiagnosed for release builds.
      */
     @Nullable
     private static Screen refused(Component title, String reason) {
@@ -274,12 +273,11 @@ public final class ClothBridge {
             return null;
         }
 
-        // Static text: a paragraph with no value. Its field name is not a label at all - Cloth's
-        // startTextDescription mints a random UUID for every description (bytecode-verified; it
-        // is the only randomUUID in ConfigEntryBuilderImpl) and the real text sits in a private
-        // field, so the note is pulled out through an accessor mixin and rendered as wrapped
-        // secondary text. Entries with no text are skipped entirely rather than leaking a UUID
-        // header.
+        // Static text: a paragraph with no value. Cloth's startTextDescription mints a random
+        // UUID as field name for every description (the only randomUUID in
+        // ConfigEntryBuilderImpl) and the real text sits in a private field, so the note is
+        // pulled out through an accessor mixin and rendered as wrapped secondary text. Entries
+        // with no text are skipped entirely rather than leaking a UUID header.
         if (entry instanceof TextListEntry textEntry) {
             Component text = ((TextListEntryAccessor) (Object) textEntry).fayberconfig$text();
             if (text != null && !text.getString().isBlank()) {
@@ -334,8 +332,8 @@ public final class ClothBridge {
             // Cloth's own widget also edits hex text; 6-digit input is opaque, 8-digit carries
             // the alpha byte through, and only parseable values are staged.
             builder.text(label,
-                    () -> hexOf((Number) current(staged, e, e.getValue())),
-                    v -> parseHexColor(v).ifPresent(i -> staged.put(e, i)),
+                    () -> ConfigEntry.hexOf(((Number) current(staged, e, e.getValue())).intValue()),
+                    v -> ConfigEntry.parseHexColor(v).ifPresent(i -> staged.put(e, i)),
                     10, HEX_LIKE, asHex(defaultOf(e)));
         } else if (entry instanceof IntegerSliderEntry e) {
             int min = intOf(plumbing.min(), 0);
@@ -569,7 +567,7 @@ public final class ClothBridge {
     }
 
     private static @Nullable String asHex(@Nullable Object value) {
-        return value instanceof Number n ? hexOf(n) : null;
+        return value instanceof Number n ? ConfigEntry.hexOf(n.intValue()) : null;
     }
 
     /** A Cloth default list as display lines; null when the default is not a list. */
@@ -698,31 +696,6 @@ public final class ClothBridge {
             parts.add("Shift");
         }
         return String.join(" + ", parts);
-    }
-
-    /** A Cloth ARGB colour as hex text; 6 digits when fully opaque, 8 otherwise. */
-    private static String hexOf(Number color) {
-        int argb = color.intValue();
-        return (argb >>> 24) == 0xFF
-                ? String.format("#%06X", argb & 0xFFFFFF)
-                : String.format("#%08X", argb);
-    }
-
-    /** Parses "#RRGGBB" (opaque) or "#AARRGGBB"; the hash is optional. */
-    private static java.util.OptionalInt parseHexColor(String text) {
-        String hex = text.trim();
-        if (hex.startsWith("#")) {
-            hex = hex.substring(1);
-        }
-        if (hex.length() != 6 && hex.length() != 8) {
-            return java.util.OptionalInt.empty();
-        }
-        try {
-            int value = (int) Long.parseLong(hex, 16);
-            return java.util.OptionalInt.of(hex.length() == 6 ? value | 0xFF000000 : value);
-        } catch (NumberFormatException e) {
-            return java.util.OptionalInt.empty();
-        }
     }
 
     /** Enum constants read better title-cased than SCREAMING_CASE. */

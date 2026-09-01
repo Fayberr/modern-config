@@ -3,7 +3,7 @@
 	"id": "fayberconfig",
 	"version": "${version}",
 	"name": "Fayber Config",
-	"description": "Slim, modern config screens for Fayber's mods. Dark rounded-card UI with live preview, cancel-restore and tooltips. Optional: mods fall back to their built-in screens when absent.",
+	"description": "Config screens for Fayber's mods, with a bridge that gives Cloth Config screens the same look.",
 	"authors": [
 		"Fayber"
 	],

@@ -71,11 +71,9 @@ public interface ConfigEntry {
     ConfigEntryList.Row createRow();
 
     /**
-     * The reset-to-default affordance for an option row, or null when no default is declared: a
-     * small rotate-ccw icon button that applies the default through {@code applyDefault}. The
-     * write follows the same path as a user edit, so it previews live and Cancel/ESC still
-     * restores the value the screen opened with. The button is visible only while the current
-     * value differs from the default.
+     * The reset-to-default button for an option row, or null when no default is declared. The
+     * write goes through the same setter as a user edit, so it previews live and Cancel/ESC
+     * still restores the value the screen opened with.
      *
      * @param defaultValue the declared default; null means the option has none
      */
@@ -551,10 +549,9 @@ public interface ConfigEntry {
 
         @Override
         public ConfigEntryList.Row createRow() {
-            // Uses the toolkit's TextField, not a raw EditBox. A borderless EditBox draws its text
-            // at the widget's top-left corner (vanilla only centres it vertically when bordered and
-            // only insets it when bordered), so a raw 150px box right-aligned in the card left the
-            // value floating high and 150px shy of the right edge. TextField owns its own card.
+            // Uses the toolkit's TextField, not a raw EditBox: a borderless EditBox draws its
+            // text at the top-left corner (vanilla only insets it when bordered), so a raw box
+            // right-aligned in the card left the value floating high and short of the edge.
             TextField field = new TextField(0, 0, FIELD_WIDTH, FIELD_HEIGHT)
                     .theme(THEME)
                     .maxLength(this.maxLength)
@@ -694,9 +691,8 @@ public interface ConfigEntry {
     }
 
     /**
-     * Fixed set of values picked from a dropdown menu: the other presentation for enums and
-     * modes, next to {@link Cycle}. Cycles step through values on click; a dropdown opens a
-     * menu, which reads better for long value lists.
+     * Fixed set of values picked from a dropdown menu, the other presentation for enums and
+     * modes next to {@link Cycle}. Reads better than a cycle for long value lists.
      */
     final class Select<T> implements ConfigEntry {
         private final Component label;
@@ -834,10 +830,9 @@ public interface ConfigEntry {
     }
 
     /**
-     * Multi-line string list editor: one item per line in a {@link TextArea}. The widget is as
-     * tall as the list needs (three lines minimum, eight maximum) and sits in a
-     * {@link ConfigEntryList.TallWidgetRow}; it scrolls internally beyond that. Item strings are
-     * not allowed to contain newlines by this representation.
+     * Multi-line string list editor: one item per line in a {@link TextArea}, three to eight
+     * lines tall in a {@link ConfigEntryList.TallWidgetRow}, scrolling internally beyond that.
+     * Item strings must not contain newlines.
      */
     final class StringList implements ConfigEntry {
         private final Component label;

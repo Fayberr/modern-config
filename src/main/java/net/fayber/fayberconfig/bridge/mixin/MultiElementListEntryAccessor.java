@@ -8,10 +8,8 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 import java.util.List;
 
 /**
- * A MultiElementListEntry is an expandable group of entries built directly rather than through
- * a builder, so its children live in this private field with no public read path. The field's
- * erased type is List, so the accessor return type must match it exactly or the mixin fails
- * to apply.
+ * Children of an expandable group entry; they are built directly, not through a builder, and
+ * only live in this private field. Return type must be exactly List or the mixin won't apply.
  */
 @Mixin(MultiElementListEntry.class)
 public interface MultiElementListEntryAccessor {

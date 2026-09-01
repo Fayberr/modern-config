@@ -12,10 +12,9 @@ import java.util.Set;
 
 /**
  * Settings for the Cloth Config bridge, stored in {@code config/fayberconfig-bridge.json}.
- *
- * <p>Written by hand rather than through a config library so the bridge stays dependency-free:
- * the file is tiny and read once. Missing file or unreadable JSON means "defaults", never a crash,
- * because this runs inside a mixin on somebody else's config screen.
+ * Parsed by hand to keep the bridge dependency-free, the file is tiny and read once. A missing
+ * or unreadable file means defaults, never a crash: this runs inside a mixin on somebody
+ * else's config screen.
  */
 public final class BridgePrefs {
     private static final String FILE_NAME = "fayberconfig-bridge.json";
@@ -41,9 +40,8 @@ public final class BridgePrefs {
     }
 
     /**
-     * Per-screen opt-out: a screen whose title is listed in {@code disabledTitles} keeps its
-     * original Cloth look. Titles are used as keys because a builder does not know which mod
-     * created it.
+     * Per-screen opt-out: a title listed in {@code disabledTitles} keeps its original Cloth
+     * look. Titles are the key because a builder does not know which mod created it.
      */
     public static boolean enabledFor(String title) {
         load();

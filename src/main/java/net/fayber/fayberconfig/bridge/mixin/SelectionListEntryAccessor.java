@@ -6,10 +6,9 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 /**
- * A plain (non-enum) SelectionListEntry keeps its selectable values in this private field with
- * no public read path; the enum subclass fills it with all constants, which is why the enum
- * branch needs no accessor. The field's declared type is ImmutableList, so the accessor return
- * type must match it exactly or the mixin fails to apply.
+ * Only the plain (non-enum) SelectionListEntry needs this, the enum subclass fills the field
+ * with all constants on its own. Return type must be ImmutableList exactly or the mixin
+ * won't apply.
  */
 @Mixin(SelectionListEntry.class)
 public interface SelectionListEntryAccessor {

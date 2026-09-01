@@ -53,10 +53,9 @@ public class ConfigEntryList extends CardList {
     }
 
     /**
-     * The reset-to-default affordance an option row can carry: a small icon button that applies
-     * the entry's declared default, shown only while the current value differs from that
-     * default. Rows position it next to the option's widget; the entry supplies both the
-     * pre-built button and the visibility check (see {@code ConfigEntry.resetOf}).
+     * The reset-to-default button an option row can carry: applies the entry's declared default,
+     * shown only while the current value differs from it. The entry supplies the pre-built
+     * button and the visibility check (see {@code ConfigEntry.resetOf}).
      */
     public record Reset(AbstractWidget button, BooleanSupplier visible) {
         public boolean shown() {
@@ -65,12 +64,11 @@ public class ConfigEntryList extends CardList {
     }
 
     /**
-     * Base row: the card drawing and theme access come from {@link CardList.Row}, plus tab
-     * visibility. A hidden row (its tab is not selected) has zero height, no children and draws
-     * nothing, so the list lays out, scrolls and hit-tests as if it were absent: 26.1's
-     * {@code AbstractSelectionList} walks {@code Entry.getHeight()} on every reposition
-     * (bytecode-verified), and {@code setScrollAmount} repositions, which is the re-layout
-     * trigger after switching tabs.
+     * Base row: card drawing and theme access come from {@link CardList.Row}, plus tab
+     * visibility. A hidden row has zero height, no children and draws nothing, so the list lays
+     * out, scrolls and hit-tests as if it were absent: 26.1's {@code AbstractSelectionList}
+     * calls {@code Entry.getHeight()} on every reposition, and {@code setScrollAmount}
+     * repositions, which is the re-layout trigger after switching tabs.
      */
     public abstract static class Row extends CardList.Row {
         private boolean visible = true;
@@ -133,10 +131,9 @@ public class ConfigEntryList extends CardList {
     /**
      * Static wrapped paragraph (documentation text, Cloth's description entries): no card, no
      * interaction, secondary text colour. The row grows with the wrapped line count, which works
-     * because 26.1's {@code AbstractSelectionList} walks {@code Entry.getHeight()} on every
-     * reposition (bytecode-verified; the same mechanism collapses hidden tab rows to 0). The wrap
-     * width follows the row width, so a note re-flows on resize and the scroll extent follows
-     * from the same {@code getHeight} call that performs the re-flow.
+     * because 26.1's {@code AbstractSelectionList} re-asks {@code Entry.getHeight()} on every
+     * reposition (the same mechanism collapses hidden tab rows to 0). The wrap width follows the
+     * row width, so a note re-flows on resize.
      */
     public static class NoteRow extends Row {
         private static final int V_PADDING = 8;
@@ -248,10 +245,9 @@ public class ConfigEntryList extends CardList {
 
     /**
      * Row with a label above a taller interactive widget (multi-line editors). The card is as
-     * tall as its contents, which works because 26.1's {@code AbstractSelectionList} walks
-     * {@code Entry.getHeight()} per entry when positioning, hit-testing and computing the scroll
-     * bounds (bytecode-verified), so an override is honoured everywhere without touching the
-     * list itself.
+     * tall as its contents, which works because 26.1's {@code AbstractSelectionList} consults
+     * {@code Entry.getHeight()} per entry when positioning, hit-testing and computing scroll
+     * bounds, so the override is honoured everywhere without touching the list itself.
      */
     public static class TallWidgetRow extends Row {
         private static final float CARD_RADIUS = 6.0f;
