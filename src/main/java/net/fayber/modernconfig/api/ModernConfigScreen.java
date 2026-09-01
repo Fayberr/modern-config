@@ -2,6 +2,7 @@ package net.fayber.modernconfig.api;
 
 import net.fayber.moderngui.render.Theme;
 import net.fayber.moderngui.render.Ui;
+import net.fayber.moderngui.screen.ColorPickerModal;
 import net.fayber.moderngui.screen.PopupHost;
 import net.fayber.moderngui.widget.Dropdown;
 import net.fayber.moderngui.widget.FlatButton;
@@ -175,6 +176,15 @@ public class ModernConfigScreen extends Screen {
             if (dropdown != null) {
                 dropdown.host(this.popupHost);
             }
+            if (row instanceof ConfigEntryList.ColorRow colorRow) {
+                // The swatch opens the HSV picker as a modal; dragging it writes through the
+                // same hex field as typing, and dismissing restores the colour captured here.
+                colorRow.pickerOpener(() -> {
+                    int start = colorRow.currentColor();
+                    this.popupHost.showModal(new ColorPickerModal(colorRow.rowLabel(), start,
+                            colorRow::applyColor, () -> colorRow.applyColor(start)));
+                });
+            }
         }
 
         int buttonY = this.height - buttonH - footerMargin;
@@ -230,11 +240,29 @@ public class ModernConfigScreen extends Screen {
 
     @Override
     public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
-        // Front-of-queue: an open dropdown menu swallows clicks inside and outside it.
-        if (this.popupHost != null && this.popupHost.handleClick(event.x(), event.y(), event.button())) {
+        // Front-of-queue: an open dropdown menu or modal swallows clicks inside and outside it.
+        if (this.popupHost != null && this.popupHost.handleClick(event, doubleClick)) {
             return true;
         }
         return super.mouseClicked(event, doubleClick);
+    }
+
+    @Override
+    public boolean mouseDragged(net.minecraft.client.input.MouseButtonEvent event, double deltaX, double deltaY) {
+        // A modal layer with a drag surface (the colour picker's square and bars) takes drags
+        // while it is open; the widgets underneath stay frozen.
+        if (this.popupHost != null && this.popupHost.modalOpen()) {
+            return this.popupHost.handleDrag(event, deltaX, deltaY);
+        }
+        return super.mouseDragged(event, deltaX, deltaY);
+    }
+
+    @Override
+    public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent event) {
+        if (this.popupHost != null && this.popupHost.modalOpen()) {
+            return this.popupHost.handleRelease(event);
+        }
+        return super.mouseReleased(event);
     }
 
     @Override
@@ -248,6 +276,16 @@ public class ModernConfigScreen extends Screen {
             return true;
         }
         return super.keyPressed(event);
+    }
+
+    @Override
+    public boolean charTyped(net.minecraft.client.input.CharacterEvent event) {
+        // A modal layer with a text field (the colour picker's hex field) takes typing while it
+        // is open; the underlying screen keeps whatever focus it had, so route chars first.
+        if (this.popupHost != null && this.popupHost.modalOpen()) {
+            return this.popupHost.handleChar(event);
+        }
+        return super.charTyped(event);
     }
 
     @Override

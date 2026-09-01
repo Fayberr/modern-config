@@ -2,5 +2,6 @@
   "modernconfig.cancel": "Cancel",
   "modernconfig.save": "Save",
   "modernconfig.restart": "Restart",
-  "modernconfig.reset_default": "Reset to default"
+  "modernconfig.reset_default": "Reset to default",
+  "modernconfig.pick_color": "Open color picker"
 }

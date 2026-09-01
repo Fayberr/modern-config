@@ -8,8 +8,8 @@ import net.fayber.moderngui.widget.FlatButton;
 import net.fayber.moderngui.widget.Icons;
 import net.fayber.moderngui.widget.IconButton;
 import net.fayber.moderngui.widget.KeybindField;
+import net.fayber.moderngui.widget.ListEditor;
 import net.fayber.moderngui.widget.PillToggle;
-import net.fayber.moderngui.widget.TextArea;
 import net.fayber.moderngui.widget.TextField;
 import net.fayber.modernconfig.gui.ConfigEntryList;
 import net.minecraft.client.gui.components.Tooltip;
@@ -126,8 +126,16 @@ public interface ConfigEntry {
      * reaches the setter.
      */
     static <T> @Nullable List<T> parseLines(String text, Function<String, @Nullable T> parse) {
+        return parseLineList(Arrays.asList(text.split("\n", -1)), parse);
+    }
+
+    /**
+     * The {@link ListEditor} flavour of {@link #parseLines}: one raw line per editor row, blank
+     * lines skipped, all-or-nothing (any unparseable line returns null and nothing is written).
+     */
+    static <T> @Nullable List<T> parseLineList(List<String> lines, Function<String, @Nullable T> parse) {
         List<T> out = new ArrayList<>();
-        for (String line : text.split("\n", -1)) {
+        for (String line : lines) {
             String trimmed = line.trim();
             if (trimmed.isEmpty()) {
                 continue;
@@ -143,11 +151,16 @@ public interface ConfigEntry {
 
     /** A number list as list-editor text, one value per line. */
     static String joinLines(List<? extends Number> values) {
+        return String.join("\n", linesOf(values));
+    }
+
+    /** A number list as editor rows, one value per row. */
+    static List<String> linesOf(List<? extends Number> values) {
         List<String> lines = new ArrayList<>(values.size());
         for (Number value : values) {
             lines.add(String.valueOf(value));
         }
-        return String.join("\n", lines);
+        return lines;
     }
 
     static @Nullable Integer parseIntOrNull(String text) {
@@ -754,8 +767,11 @@ public interface ConfigEntry {
                     .value(hexOf(this.getter.getAsInt()))
                     .validator(COLOR_TEXT)
                     .onChanged(text -> parseHexColor(text).ifPresent(this.setter::accept));
+            // Both the picker and the reset button write through the hex field, so its responder
+            // stays the one write path and the text always matches the applied value.
+            IntConsumer writeHex = value -> field.value(hexOf(value));
             return new ConfigEntryList.ColorRow(this.label, this.tooltip, field, this.getter::getAsInt,
-                    resetOf(this.defaultValue, this.getter::getAsInt, value -> field.value(hexOf(value))));
+                    writeHex, resetOf(this.defaultValue, this.getter::getAsInt, writeHex::accept));
         }
     }
 
@@ -1017,9 +1033,9 @@ public interface ConfigEntry {
     }
 
     /**
-     * Multi-line string list editor: one item per line in a {@link TextArea}, three to eight
-     * lines tall in a {@link ConfigEntryList.TallWidgetRow}, scrolling internally beyond that.
-     * Item strings must not contain newlines.
+     * Multi-line string list editor: one item per row in a {@link ListEditor} (its own field plus
+     * remove button per item, add row at the bottom) inside a {@link ConfigEntryList.TallWidgetRow}
+     * that grows with the row count. Blank rows are skipped on write.
      */
     final class StringList implements ConfigEntry {
         private final Component label;
@@ -1085,29 +1101,22 @@ public interface ConfigEntry {
 
         @Override
         public ConfigEntryList.Row createRow() {
-            // One line of headroom over the current item count so adding an item needs no resize;
-            // TextArea pads 8 on top and bottom.
-            int visibleLines = Math.clamp(this.getter.get().size() + 1, 3, 8);
-            int areaHeight = 2 * 8 + visibleLines * Ui.font().lineHeight;
-            TextArea area = new TextArea(0, 0, 100, areaHeight)
+            ListEditor editor = new ListEditor(0, 0, 100, List.copyOf(this.getter.get()))
                     .theme(THEME)
-                    .maxLength(4000)
-                    .value(String.join("\n", this.getter.get()))
-                    .onChanged(text -> this.setter.accept(
-                            new ArrayList<>(Arrays.asList(text.split("\n", -1)))));
-            return new ConfigEntryList.TallWidgetRow(this.label, this.tooltip, area,
-                    resetOf(this.defaultValue, this.getter, value -> {
-                        // Unlike TextField, TextArea.value does not fire onChanged, so the reset
-                        // applies the default itself and then repaints the editor.
-                        this.setter.accept(value);
-                        area.value(String.join("\n", value));
-                    }));
+                    .onChanged(lines -> {
+                        List<String> parsed = parseLineList(lines, Function.identity());
+                        if (parsed != null) {
+                            this.setter.accept(parsed);
+                        }
+                    });
+            return new ConfigEntryList.TallWidgetRow(this.label, this.tooltip, editor,
+                    resetOf(this.defaultValue, this.getter, editor::value));
         }
     }
 
     /**
-     * List of integers edited one item per line in a {@link TextArea}. Blank lines are skipped;
-     * a line that does not parse leaves the last valid value in place (all-or-nothing, so a
+     * List of integers edited one item per row in a {@link ListEditor}. Blank rows are skipped;
+     * a row that does not parse leaves the last valid value in place (all-or-nothing, so a
      * half-typed number never reaches the setter).
      */
     final class IntList implements ConfigEntry {
@@ -1174,23 +1183,17 @@ public interface ConfigEntry {
 
         @Override
         public ConfigEntryList.Row createRow() {
-            int visibleLines = Math.clamp(this.getter.get().size() + 1, 3, 8);
-            int areaHeight = 2 * 8 + visibleLines * Ui.font().lineHeight;
-            TextArea area = new TextArea(0, 0, 100, areaHeight)
+            ListEditor editor = new ListEditor(0, 0, 100, linesOf(this.getter.get()))
                     .theme(THEME)
-                    .maxLength(4000)
-                    .value(joinLines(this.getter.get()))
-                    .onChanged(text -> {
-                        List<Integer> parsed = parseLines(text, ConfigEntry::parseIntOrNull);
+                    .lineValidator(s -> parseIntOrNull(s) != null)
+                    .onChanged(lines -> {
+                        List<Integer> parsed = parseLineList(lines, ConfigEntry::parseIntOrNull);
                         if (parsed != null) {
                             this.setter.accept(parsed);
                         }
                     });
-            return new ConfigEntryList.TallWidgetRow(this.label, this.tooltip, area,
-                    resetOf(this.defaultValue, this.getter, value -> {
-                        this.setter.accept(value);
-                        area.value(joinLines(value));
-                    }));
+            return new ConfigEntryList.TallWidgetRow(this.label, this.tooltip, editor,
+                    resetOf(this.defaultValue, this.getter, value -> editor.value(linesOf(value))));
         }
     }
 
@@ -1259,23 +1262,17 @@ public interface ConfigEntry {
 
         @Override
         public ConfigEntryList.Row createRow() {
-            int visibleLines = Math.clamp(this.getter.get().size() + 1, 3, 8);
-            int areaHeight = 2 * 8 + visibleLines * Ui.font().lineHeight;
-            TextArea area = new TextArea(0, 0, 100, areaHeight)
+            ListEditor editor = new ListEditor(0, 0, 100, linesOf(this.getter.get()))
                     .theme(THEME)
-                    .maxLength(4000)
-                    .value(joinLines(this.getter.get()))
-                    .onChanged(text -> {
-                        List<Float> parsed = parseLines(text, ConfigEntry::parseFloatOrNull);
+                    .lineValidator(s -> parseFloatOrNull(s) != null)
+                    .onChanged(lines -> {
+                        List<Float> parsed = parseLineList(lines, ConfigEntry::parseFloatOrNull);
                         if (parsed != null) {
                             this.setter.accept(parsed);
                         }
                     });
-            return new ConfigEntryList.TallWidgetRow(this.label, this.tooltip, area,
-                    resetOf(this.defaultValue, this.getter, value -> {
-                        this.setter.accept(value);
-                        area.value(joinLines(value));
-                    }));
+            return new ConfigEntryList.TallWidgetRow(this.label, this.tooltip, editor,
+                    resetOf(this.defaultValue, this.getter, value -> editor.value(linesOf(value))));
         }
     }
 
@@ -1344,23 +1341,17 @@ public interface ConfigEntry {
 
         @Override
         public ConfigEntryList.Row createRow() {
-            int visibleLines = Math.clamp(this.getter.get().size() + 1, 3, 8);
-            int areaHeight = 2 * 8 + visibleLines * Ui.font().lineHeight;
-            TextArea area = new TextArea(0, 0, 100, areaHeight)
+            ListEditor editor = new ListEditor(0, 0, 100, linesOf(this.getter.get()))
                     .theme(THEME)
-                    .maxLength(4000)
-                    .value(joinLines(this.getter.get()))
-                    .onChanged(text -> {
-                        List<Double> parsed = parseLines(text, ConfigEntry::parseDoubleOrNull);
+                    .lineValidator(s -> parseDoubleOrNull(s) != null)
+                    .onChanged(lines -> {
+                        List<Double> parsed = parseLineList(lines, ConfigEntry::parseDoubleOrNull);
                         if (parsed != null) {
                             this.setter.accept(parsed);
                         }
                     });
-            return new ConfigEntryList.TallWidgetRow(this.label, this.tooltip, area,
-                    resetOf(this.defaultValue, this.getter, value -> {
-                        this.setter.accept(value);
-                        area.value(joinLines(value));
-                    }));
+            return new ConfigEntryList.TallWidgetRow(this.label, this.tooltip, editor,
+                    resetOf(this.defaultValue, this.getter, value -> editor.value(linesOf(value))));
         }
     }
 

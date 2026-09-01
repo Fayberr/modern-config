@@ -18,10 +18,12 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
+import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 
@@ -429,10 +431,12 @@ public class ConfigEntryList extends CardList {
     }
 
     /**
-     * Row with a label above a taller interactive widget (multi-line editors). The card is as
-     * tall as its contents, which works because 26.1's {@code AbstractSelectionList} consults
+     * Row with a label above a taller interactive widget (list editors). The card is as tall as
+     * its contents, which works because 26.1's {@code AbstractSelectionList} consults
      * {@code Entry.getHeight()} per entry when positioning, hit-testing and computing scroll
-     * bounds, so the override is honoured everywhere without touching the list itself.
+     * bounds, so the override is honoured everywhere without touching the list itself. The height
+     * is re-derived every time it is asked, so an editor whose row count changes (add/remove)
+     * grows and shrinks the card live.
      */
     public static class TallWidgetRow extends Row {
         private static final float CARD_RADIUS = 6.0f;
@@ -444,7 +448,6 @@ public class ConfigEntryList extends CardList {
         private final AbstractWidget widget;
         @Nullable
         private final Reset reset;
-        private final int height;
 
         public TallWidgetRow(Component label, Component tooltip, AbstractWidget widget) {
             this(label, tooltip, widget, null);
@@ -456,7 +459,6 @@ public class ConfigEntryList extends CardList {
             this.reset = reset;
             this.entryTooltip(tooltip);
             this.syncTooltip();
-            this.height = TOP_PAD + Ui.font().lineHeight + LABEL_GAP + widget.getHeight() + BOTTOM_PAD;
         }
 
         @Override
@@ -466,7 +468,10 @@ public class ConfigEntryList extends CardList {
 
         @Override
         public int getHeight() {
-            return this.isVisible() ? this.height : 0;
+            if (!this.isVisible()) {
+                return 0;
+            }
+            return TOP_PAD + Ui.font().lineHeight + LABEL_GAP + this.widget.getHeight() + BOTTOM_PAD;
         }
 
         @Override
@@ -485,7 +490,7 @@ public class ConfigEntryList extends CardList {
             boolean error = this.optionError() != null;
             int border = error ? ERROR_BORDER
                     : (hovered ? this.theme().cardBorderHover : this.theme().cardBorder);
-            Ui.roundRectBorder(gfx, this.getX(), this.cardY(), this.getWidth(), this.height, CARD_RADIUS,
+            Ui.roundRectBorder(gfx, this.getX(), this.cardY(), this.getWidth(), this.getHeight(), CARD_RADIUS,
                     hovered ? this.theme().cardHover : this.theme().card, border, 1.0f);
             int labelY = this.cardY() + TOP_PAD;
             Ui.text(gfx, this.label, this.getX() + CARD_PADDING, labelY, this.labelColor());
@@ -581,10 +586,12 @@ public class ConfigEntryList extends CardList {
     }
 
     /**
-     * Row for a colour option: label on the left, a live colour swatch and the hex text field on
-     * the right. The swatch is pure decoration drawn from the entry's getter every frame, so it
-     * tracks the last valid value while the hex text is being typed; the field is the row's only
-     * interactive child.
+     * Row for a colour option: label on the left, then a colour swatch and the hex text field on
+     * the right. The swatch reads the entry's getter every frame (so it tracks the last valid
+     * value while the hex text is being typed) and, once the screen attaches a
+     * {@link #pickerOpener}, clicking it opens the colour picker modal. Writes always go through
+     * the hex field (its responder writes through), so picker drags preview live and the text
+     * stays the one source of truth.
      */
     public static class ColorRow extends Row {
         private static final int SWATCH_SIZE = 14;
@@ -592,18 +599,52 @@ public class ConfigEntryList extends CardList {
 
         private final Component label;
         private final TextField field;
+        private final ColorSwatch swatch;
         private final IntSupplier color;
+        /** Consumer for a picked colour; the entry formats it into the hex field. */
+        private final IntConsumer applyColor;
         @Nullable
         private final Reset reset;
+        @Nullable
+        private Runnable pickerOpener;
 
         public ColorRow(Component label, Component tooltip, TextField field, IntSupplier color,
-                        @Nullable Reset reset) {
+                        IntConsumer applyColor, @Nullable Reset reset) {
             this.label = Ui.ui(label);
             this.field = field;
             this.color = color;
+            this.applyColor = applyColor;
+            this.swatch = new ColorSwatch(0, 0, SWATCH_SIZE, color, () -> {
+                if (this.pickerOpener != null) {
+                    this.pickerOpener.run();
+                }
+            }).theme(Theme.dark()).tooltip(Component.translatable("modernconfig.pick_color"));
             this.reset = reset;
             this.entryTooltip(tooltip);
             this.syncTooltip();
+        }
+
+        /** The entry's current colour, captured when the picker opens (the cancel-restore point). */
+        public int currentColor() {
+            return this.color.getAsInt();
+        }
+
+        /** Writes a picked colour through the hex field (its responder applies it). */
+        public void applyColor(int argb) {
+            this.applyColor.accept(argb);
+        }
+
+        /**
+         * Attaches the open-the-picker action; the screen wires this after building the rows
+         * because the popup host does not exist yet when entries create their rows.
+         */
+        public void pickerOpener(@Nullable Runnable pickerOpener) {
+            this.pickerOpener = pickerOpener;
+        }
+
+        /** The row label, so the picker modal can carry the option's name. */
+        public Component rowLabel() {
+            return this.label;
         }
 
         @Override
@@ -613,10 +654,13 @@ public class ConfigEntryList extends CardList {
 
         @Override
         protected List<? extends GuiEventListener> visibleChildren() {
-            if (this.reset == null || !this.reset.shown()) {
-                return List.of(this.field);
+            List<AbstractWidget> children = new ArrayList<>(3);
+            if (this.reset != null && this.reset.shown()) {
+                children.add(this.reset.button());
             }
-            return List.of(this.field, this.reset.button());
+            children.add(this.swatch);
+            children.add(this.field);
+            return children;
         }
 
         @Override
@@ -633,6 +677,9 @@ public class ConfigEntryList extends CardList {
             this.syncTooltip();
             boolean resetShown = this.reset != null && this.reset.shown();
             int swatchX = this.field.getX() - SWATCH_GAP - SWATCH_SIZE;
+            int swatchY = this.cardY() + (CARD_HEIGHT - SWATCH_SIZE) / 2;
+            this.swatch.setPosition(swatchX, swatchY);
+            this.swatch.active = this.optionEnabled();
             if (resetShown) {
                 AbstractWidget button = this.reset.button();
                 button.setPosition(swatchX - 6 - button.getWidth(),
@@ -642,9 +689,7 @@ public class ConfigEntryList extends CardList {
             this.drawRestartBadge(gfx, mouseX, mouseY, partialTick,
                     this.getX() + CARD_PADDING + Ui.font().width(this.label), rightLimit, this.badgeY());
             this.field.extractRenderState(gfx, mouseX, mouseY, partialTick);
-            int swatchY = this.cardY() + (CARD_HEIGHT - SWATCH_SIZE) / 2;
-            Ui.roundRectBorder(gfx, swatchX, swatchY, SWATCH_SIZE, SWATCH_SIZE, 4.0f,
-                    this.color.getAsInt(), this.theme().cardBorderHover, 1.0f);
+            this.swatch.extractRenderState(gfx, mouseX, mouseY, partialTick);
             if (resetShown) {
                 this.reset.button().extractRenderState(gfx, mouseX, mouseY, partialTick);
             }

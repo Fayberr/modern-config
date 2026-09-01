@@ -83,7 +83,8 @@ public final class PreviewHook {
                 })
                 .tab("General")
                 .note("One of every option type. Changes preview live while the screen is open; "
-                        + "Cancel or ESC puts every value back.")
+                        + "click the colour swatch to open the picker, and Cancel or ESC puts "
+                        + "every value back.")
                 .category("Basics")
                 .bool("Enabled", () -> s.enabled, v -> s.enabled = v, true)
                 .tooltip("Master switch; the slider below only responds while this is on.")
@@ -96,11 +97,12 @@ public final class PreviewHook {
                 .error(() -> s.displayName.isBlank() ? "Name cannot be empty." : null)
                 .color("Accent Color", () -> s.accentColor, v -> s.accentColor = v, 0xFF3B82F6)
                 .keybind("Toggle Key", () -> s.toggleKey, v -> s.toggleKey = v, GLFW_KEY_G)
+                .bool("High Contrast", () -> s.highContrast, v -> s.highContrast = v, true)
+                .requiresRestart()
+                .tooltip("The change applies after a restart.")
                 .tab("Advanced")
                 .category("Sliders")
                 .intSlider("Range", () -> s.range, v -> s.range = v, 0, 64, 1, 16)
-                .requiresRestart()
-                .tooltip("The change applies after a restart.")
                 .doubleSlider("Scale", () -> s.scale, v -> s.scale = v, 0.5, 3.0, 0.1, 1.0)
                 .category("Lists")
                 .stringList("Tags", () -> s.tags, v -> s.tags = v, List.of("alpha"))
@@ -124,6 +126,7 @@ public final class PreviewHook {
         String displayName = "Player";
         int accentColor = 0xFF3B82F6;
         int toggleKey = 79; // GLFW_KEY_O; not the default, so the reset button shows
+        boolean highContrast = true;
         int range = 16;
         double scale = 1.0;
         List<String> tags = List.of("alpha");
@@ -141,6 +144,7 @@ public final class PreviewHook {
             this.displayName = defaults.displayName;
             this.accentColor = defaults.accentColor;
             this.toggleKey = defaults.toggleKey;
+            this.highContrast = defaults.highContrast;
             this.range = defaults.range;
             this.scale = defaults.scale;
             this.tags = defaults.tags;
