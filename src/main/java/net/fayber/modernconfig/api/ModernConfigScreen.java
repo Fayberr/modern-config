@@ -297,7 +297,7 @@ public class ModernConfigScreen extends Screen {
     }
 
     /** Tab bar callback: shows only the new tab's rows and re-lays the list out from the top. */
-    private void selectTab(int index) {
+    public void selectTab(int index) {
         if (index == this.activeTab) {
             return;
         }

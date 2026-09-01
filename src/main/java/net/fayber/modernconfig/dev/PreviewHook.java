@@ -46,10 +46,31 @@ public final class PreviewHook {
             }
         }
         final double target = scrollTarget;
+        // -Dmodernconfig.previewTab=<index> switches to that tab once the screen is up.
+        final int tabTarget = Integer.getInteger("modernconfig.previewTab", -1);
+        // -Dmodernconfig.previewClick=<x>,<y> (GUI px) dispatches one synthetic left click at
+        // that screen position through Screen.mouseClicked, the same path a real click takes.
+        double clickX = -1;
+        double clickY = -1;
+        String clickProp = System.getProperty("modernconfig.previewClick");
+        if (clickProp != null) {
+            String[] parts = clickProp.split(",");
+            if (parts.length == 2) {
+                try {
+                    clickX = Double.parseDouble(parts[0].trim());
+                    clickY = Double.parseDouble(parts[1].trim());
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+        final double cx = clickX;
+        final double cy = clickY;
         ClientTickEvents.END_CLIENT_TICK.register(new ClientTickEvents.EndTick() {
             private int ticks = 0;
             private boolean opened = false;
+            private boolean tabbed = false;
             private boolean scrolled = false;
+            private boolean clicked = false;
 
             @Override
             public void onEndTick(net.minecraft.client.Minecraft client) {
@@ -65,11 +86,30 @@ public final class PreviewHook {
                     client.setScreen(demoScreen());
                     return;
                 }
-                if (target > 0.0 && !this.scrolled && ++this.ticks >= 40) {
+                this.ticks++;
+                if (tabTarget >= 0 && !this.tabbed && this.ticks >= 30) {
+                    this.tabbed = true;
+                    if (client.screen instanceof ModernConfigScreen screen) {
+                        screen.selectTab(tabTarget);
+                        ModernConfigClient.LOGGER.info("PREVIEW: tab set to " + tabTarget);
+                    }
+                }
+                if (target > 0.0 && !this.scrolled && this.ticks >= 45) {
                     this.scrolled = true;
                     if (client.screen instanceof ModernConfigScreen screen) {
                         screen.entryList().smoothScrollTo(target);
                         ModernConfigClient.LOGGER.info("PREVIEW: scroll set to " + target);
+                    }
+                }
+                if (cx >= 0 && !this.clicked && this.ticks >= 60) {
+                    this.clicked = true;
+                    if (client.screen instanceof ModernConfigScreen screen) {
+                        var event = new net.minecraft.client.input.MouseButtonEvent(cx, cy,
+                                new net.minecraft.client.input.MouseButtonInfo(
+                                        org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT, 0));
+                        boolean taken = screen.mouseClicked(event, false);
+                        ModernConfigClient.LOGGER
+                                .info("PREVIEW: click at " + cx + "," + cy + " -> " + taken);
                     }
                 }
             }

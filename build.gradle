@@ -54,6 +54,12 @@ loom {
 			if (project.hasProperty('mcPreviewScroll')) {
 				vmArg "-Dmodernconfig.previewScroll=${project.property('mcPreviewScroll')}"
 			}
+			if (project.hasProperty('mcPreviewTab')) {
+				vmArg "-Dmodernconfig.previewTab=${project.property('mcPreviewTab')}"
+			}
+			if (project.hasProperty('mcPreviewClick')) {
+				vmArg "-Dmodernconfig.previewClick=${project.property('mcPreviewClick')}"
+			}
 		}
 	}
 }
