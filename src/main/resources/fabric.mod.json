@@ -1,8 +1,8 @@
 {
 	"schemaVersion": 1,
-	"id": "fayberconfig",
+	"id": "modernconfig",
 	"version": "${version}",
-	"name": "Fayber Config",
+	"name": "Modern Config",
 	"description": "Config screens for Fayber's mods, with a bridge that gives Cloth Config screens the same look.",
 	"authors": [
 		"Fayber"
@@ -12,23 +12,23 @@
 		"sources": "https://github.com/Fayberr/fayber-config"
 	},
 	"license": "GPL-3.0-or-later",
-	"icon": "assets/fayberconfig/icon.png",
+	"icon": "assets/modernconfig/icon.png",
 	"environment": "client",
 	"entrypoints": {
 		"client": [
-			"net.fayber.fayberconfig.FayberConfigClient"
+			"net.fayber.modernconfig.ModernConfigClient"
 		]
 	},
-	"accessWidener": "fayberconfig.accesswidener",
+	"accessWidener": "modernconfig.accesswidener",
 	"mixins": [
-		"fayberconfig.cloth.mixins.json"
+		"modernconfig.cloth.mixins.json"
 	],
 	"depends": {
 		"fabricloader": ">=${loader_version}",
 		"minecraft": ">=26.1 <26.2",
 		"java": ">=25",
 		"fabric-api": "*",
-		"faybergui": ">=${fayber_gui_version} <1.1"
+		"moderngui": ">=${modern_gui_version} <1.1"
 	},
 	"breaks": {
 		"cloth-config": "<26.1.154"

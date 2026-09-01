@@ -1,9 +1,9 @@
-# Fayber Config - Modrinth page copy
+# Modern Config - Modrinth page copy
 
-Source of truth for the text on https://modrinth.com/mod/fayber-config.
+Source of truth for the text on https://modrinth.com/mod/modern-config.
 Update here first, then run:
 
-    modrinth copy fayber-config modrinth-page.md
+    modrinth copy modern-config modrinth-page.md
 
 The `## description` and `## body` sections are what gets uploaded.
 The `#` title line and the parenthetical note below are local only.
@@ -15,9 +15,9 @@ Config screens for Fayber's mods, with a bridge that gives Cloth Config screens 
 
 ## body (full page)
 
-# Fayber Config
+# Modern Config
 
-Fayber Config gives mods a settings screen that is one scrolling column of cards instead of the usual dense panel. Changes preview live while the screen is open, and Cancel or ESC puts every value back the way it was. Mods built for it fall back to their own screens when it is absent, so it stays optional.
+Modern Config gives mods a settings screen that is one scrolling column of cards instead of the usual dense panel. Changes preview live while the screen is open, and Cancel or ESC puts every value back the way it was. Mods built for it fall back to their own screens when it is absent, so it stays optional.
 
 ## Screens
 
@@ -25,7 +25,7 @@ Fayber Config gives mods a settings screen that is one scrolling column of cards
 - Options that declare a default get a reset button, shown while the value differs from it.
 - Tabs split large configs into pages; the tab strip scrolls when there are more tabs than fit.
 - Tooltips on options that declare one.
-- `/fayberconfig demo` opens a screen with one of every option type.
+- `/modernconfig demo` opens a screen with one of every option type.
 
 ## Cloth Config bridge
 
@@ -36,7 +36,7 @@ When Cloth Config is installed, its screens are translated into the same look in
 Build a screen with the builder:
 
 ```java
-FayberConfigScreen.builder(title, parent, onSave)
+ModernConfigScreen.builder(title, parent, onSave)
     .category("General")
     .bool("Enabled", () -> state.enabled, v -> state.enabled = v, true)
     .intSlider("Range", () -> state.range, v -> state.range = v, 0, 64, 1)
@@ -44,5 +44,5 @@ FayberConfigScreen.builder(title, parent, onSave)
 ```
 
 - Colors, cycles, dropdowns, keybinds, string and number lists, text fields, notes and corner buttons are also in the builder. Optional default values add reset-to-default buttons.
-- Requires the Fayber GUI library as a separate dependency; the only other dependency is Fabric API.
+- Requires the Modern GUI library as a separate dependency; the only other dependency is Fabric API.
 - GPL-3.0-or-later.

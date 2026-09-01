@@ -13,15 +13,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Generates assets/fayberconfig/icon.png: the mod icon, a plain white
+ * Generates assets/modernconfig/icon.png: the mod icon, a plain white
  * cogwheel on a transparent background. The gear is the Lucide "settings"
- * icon, the same glyph the Fayber GUI library embeds for in-game settings
+ * icon, the same glyph the Modern GUI library embeds for in-game settings
  * buttons (https://lucide.dev, ISC license), so the mod icon and the UI
  * iconography match. Regenerate offline with:
  *
  * <pre>   java tools/gen-icon.java [out.png]</pre>
  *
- * <p>The embedded parser is the same mini-parser as the Fayber GUI
+ * <p>The embedded parser is the same mini-parser as the Modern GUI
  * generator: it covers the SVG path subset Lucide uses (M/L/H/V/C/S/Q/T/A/Z
  * with relative forms and implicit repeats, plus circle and polygon
  * elements). The 24-unit icon is rasterised at 512 px with anti-aliasing
@@ -62,7 +62,7 @@ public class GenIcon {
         BufferedImage out = scale(half, SIZE);
 
         File file = new File(args.length > 0 ? args[0]
-                : "src/main/resources/assets/fayberconfig/icon.png");
+                : "src/main/resources/assets/modernconfig/icon.png");
         ImageIO.write(out, "png", file);
         System.out.println("wrote " + file.getAbsolutePath() + " (" + file.length()
                 + " bytes, " + SIZE + "x" + SIZE + ")");
@@ -102,7 +102,7 @@ public class GenIcon {
     }
 
     // ------------------------------------------------------------------ path parser
-    // Same parser as Fayber GUI's tools/gen-icons.java (M/L/H/V/C/S/Q/T/A/Z with
+    // Same parser as Modern GUI's tools/gen-icons.java (M/L/H/V/C/S/Q/T/A/Z with
     // relative forms and implicit repeats); kept verbatim so both mods rasterise
     // identically.
 

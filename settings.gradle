@@ -10,4 +10,4 @@ pluginManagement {
 }
 
 // Should match your mod id
-rootProject.name = 'fayberconfig'
+rootProject.name = 'modernconfig'

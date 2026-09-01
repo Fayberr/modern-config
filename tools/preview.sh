@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Headless design workbench for Fayber Config.
+# Headless design workbench for Modern Config.
 #
 # Boots the dev client on a private Xvfb display, waits for the preview hook to open the demo
 # config screen, grabs a single frame with ffmpeg, then tears everything down. Lets the GUI be
@@ -11,18 +11,18 @@
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OUT="${1:-/tmp/fayberconfig-preview.png}"
+OUT="${1:-/tmp/modernconfig-preview.png}"
 GUI_SCALE="${2:-3}"
 WAIT="${3:-90}"
 SCROLL_SET="${4:-}"
-DISPLAY_NUM="${FC_DISPLAY:-:97}"
+DISPLAY_NUM="${MC_DISPLAY:-:97}"
 W=1280
 H=720
-JDK="${FC_JDK:-/home/fayber/.jdks/jdk-25.0.4+7}"
+JDK="${MC_JDK:-/home/fayber/.jdks/jdk-25.0.4+7}"
 
 cleanup() {
 	[[ -n "${GRADLE_PID:-}" ]] && kill -9 "$GRADLE_PID" 2>/dev/null
-	pkill -f "fayberconfig.preview=true" 2>/dev/null
+	pkill -f "modernconfig.preview=true" 2>/dev/null
 	[[ -n "${XVFB_PID:-}" ]] && kill -9 "$XVFB_PID" 2>/dev/null
 	return 0
 }
@@ -42,12 +42,12 @@ Xvfb "$DISPLAY_NUM" -screen 0 "${W}x${H}x24" >/dev/null 2>&1 &
 XVFB_PID=$!
 sleep 2
 
-LOG=/tmp/fayberconfig-preview.log
+LOG=/tmp/modernconfig-preview.log
 : >"$LOG"
 (
 	cd "$HERE" || exit 1
-	DISPLAY="$DISPLAY_NUM" ./gradlew runClient -PfcPreview=true \
-		${SCROLL_SET:+-PfcPreviewScroll=$SCROLL_SET} \
+	DISPLAY="$DISPLAY_NUM" ./gradlew runClient -PmcPreview=true \
+		${SCROLL_SET:+-PmcPreviewScroll=$SCROLL_SET} \
 		-Dorg.gradle.java.home="$JDK" >>"$LOG" 2>&1
 ) &
 GRADLE_PID=$!
