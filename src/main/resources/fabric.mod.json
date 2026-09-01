@@ -12,6 +12,7 @@
 		"sources": "https://github.com/Fayberr/fayber-config"
 	},
 	"license": "GPL-3.0-or-later",
+	"icon": "assets/fayberconfig/icon.png",
 	"environment": "client",
 	"entrypoints": {
 		"client": [
