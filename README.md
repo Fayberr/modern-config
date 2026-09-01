@@ -66,6 +66,13 @@ before it. Overloads that take a default value add a reset button to the card wh
 value differs from that default. `ModernConfigScreen.Builder` in the source lists every method
 with its javadoc.
 
+Two entry kinds have richer editors: `color` renders a live swatch next to the hex field, and
+clicking the swatch opens a full HSV color picker (saturation/value square, hue and alpha bars,
+hex field; dismissing it restores the color the row had when it opened). The four `*List`
+entries render one text field per item with a remove button and an add row at the bottom, so a
+list reads as a list; invalid items are marked red and are never written until every line
+parses.
+
 Four fluent calls attach to the option added just before them: `tooltip(...)`, plus three
 per-option states. `requiresRestart()` shows a Restart badge on the card (the setter still
 writes through live; the badge only tells the player a restart is needed to apply it).
