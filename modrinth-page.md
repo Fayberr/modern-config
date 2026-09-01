@@ -11,7 +11,7 @@ Voice: short, concrete, no config-key dumps, no "and more". No em-dashes.
 
 ## description (short summary line)
 
-Config screens for Fayber's mods, with a bridge that gives Cloth Config screens the same look.
+Config screens for Fabric mods: one builder line per option, live preview while the screen is open, and a bridge that renders Cloth Config screens in the same look.
 
 ## body (full page)
 
@@ -44,5 +44,9 @@ ModernConfigScreen.builder(title, parent, onSave)
 ```
 
 - Colors, cycles, dropdowns, keybinds, string and number lists, text fields, notes and corner buttons are also in the builder. Optional default values add reset-to-default buttons.
-- Requires the Modern GUI library as a separate dependency; the only other dependency is Fabric API.
-- GPL-3.0-or-later.
+- Setters run on every input, so changes preview live while the screen is open. Options snapshot when the screen opens; Cancel or ESC restores them, and Save runs your onSave.
+- Existing builder calls keep working across all 1.x releases; new options arrive as additional methods.
+- Add it as an optional, compileOnly dependency (`"net.fayber:modern-config"` from `mavenLocal()` today, `maven.modrinth:modern-config` from the Modrinth maven once approved) and never bundle the jar. Requires the Modern GUI library as a separate dependency at runtime; the only other dependency is Fabric API.
+- Keep the screen optional with the router pattern: check `FabricLoader.isModLoaded("modernconfig")`, open your Modern Config screen, fall back to a Cloth Config screen, else open nothing. Keep each screen in its own class so its imports only classload after the check passes.
+- Point Mod Menu at the same router: `getModConfigScreenFactory()` returns it, and the Waypoints mod ships a complete reference implementation in its compat package.
+- GPL-3.0-or-later. The full developer guide is in the README on the source page.
