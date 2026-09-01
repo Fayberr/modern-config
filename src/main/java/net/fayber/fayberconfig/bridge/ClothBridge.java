@@ -306,24 +306,29 @@ public final class ClothBridge {
         });
 
         if (entry instanceof BooleanListEntry e) {
-            builder.bool(label, () -> (Boolean) current(staged, e, e.getValue()), v -> staged.put(e, v));
+            builder.bool(label, () -> (Boolean) current(staged, e, e.getValue()), v -> staged.put(e, v),
+                    asBoolean(defaultOf(e)));
         } else if (entry instanceof KeyCodeEntry e) {
             me.shedaniel.clothconfig2.api.ModifierKeyCode bind = e.getValue();
             if (bind == null) {
                 return "'" + label + "' (key bind) has no value";
             }
+            me.shedaniel.clothconfig2.api.ModifierKeyCode defaultBind =
+                    defaultOf(e) instanceof me.shedaniel.clothconfig2.api.ModifierKeyCode declared ? declared : null;
             // The bind is staged as a ModifierKeyCode copy so a key edit never clobbers the
             // modifier and vice versa; both rows read the same staged object.
             builder.keybind(label,
                     () -> keyCodeOf(currentBind(staged, e, bind)),
                     code -> stageKeyCode(staged, e, currentBind(staged, e, bind), code,
-                            e.isAllowKey(), e.isAllowMouse()));
+                            e.isAllowKey(), e.isAllowMouse()),
+                    defaultBind == null ? null : keyCodeOf(defaultBind));
             if (e.isAllowModifiers()) {
                 builder.cycle(label + " modifiers",
                         () -> currentBind(staged, e, bind).getModifier(),
                         m -> staged.put(e, me.shedaniel.clothconfig2.api.ModifierKeyCode
                                 .copyOf(currentBind(staged, e, bind)).setModifier(m)),
-                        MODIFIER_COMBOS, ClothBridge::modifierName);
+                        MODIFIER_COMBOS, ClothBridge::modifierName,
+                        defaultBind == null ? null : defaultBind.getModifier());
             }
         } else if (entry instanceof ColorEntry e) {
             // Cloth's own widget also edits hex text; 6-digit input is opaque, 8-digit carries
@@ -331,23 +336,24 @@ public final class ClothBridge {
             builder.text(label,
                     () -> hexOf((Number) current(staged, e, e.getValue())),
                     v -> parseHexColor(v).ifPresent(i -> staged.put(e, i)),
-                    10, HEX_LIKE);
+                    10, HEX_LIKE, asHex(defaultOf(e)));
         } else if (entry instanceof IntegerSliderEntry e) {
             int min = intOf(plumbing.min(), 0);
             int max = intOf(plumbing.max(), 100);
             builder.intSlider(label, () -> (Integer) current(staged, e, e.getValue()),
-                    v -> staged.put(e, v), min, max, 1);
+                    v -> staged.put(e, v), min, max, 1, asInt(defaultOf(e)));
         } else if (entry instanceof LongSliderEntry e) {
             long min = longOf(plumbing.min(), 0L);
             long max = longOf(plumbing.max(), 100L);
             if (min >= Integer.MIN_VALUE && max <= Integer.MAX_VALUE) {
                 builder.intSlider(label, () -> ((Number) current(staged, e, e.getValue())).intValue(),
-                        v -> staged.put(e, (long) v), (int) min, (int) max, 1);
+                        v -> staged.put(e, (long) v), (int) min, (int) max, 1, asInt(defaultOf(e)));
             } else {
                 // Fayber has no long slider; a range beyond int becomes a text field, which still
                 // shows and saves the exact value instead of refusing the whole screen.
                 builder.text(label, () -> String.valueOf(current(staged, e, e.getValue())),
-                        v -> parseLong(v).ifPresent(l -> staged.put(e, l)), 20, INT_LIKE);
+                        v -> parseLong(v).ifPresent(l -> staged.put(e, l)), 20, INT_LIKE,
+                        asString(defaultOf(e)));
             }
         } else if (entry instanceof IntegerListEntry e) {
             int min = intOf(plumbing.min(), Integer.MIN_VALUE);
@@ -356,37 +362,41 @@ public final class ClothBridge {
                 // Unbounded: a slider would be meaningless, so show it as a text field. Values are
                 // only staged while the text parses, so half-typed states never reach Save.
                 builder.text(label, () -> String.valueOf(current(staged, e, e.getValue())),
-                        v -> parseInt(v).ifPresent(i -> staged.put(e, i)), 12, INT_LIKE);
+                        v -> parseInt(v).ifPresent(i -> staged.put(e, i)), 12, INT_LIKE,
+                        asString(defaultOf(e)));
             } else {
                 builder.intSlider(label, () -> (Integer) current(staged, e, e.getValue()),
-                        v -> staged.put(e, v), min, max, 1);
+                        v -> staged.put(e, v), min, max, 1, asInt(defaultOf(e)));
             }
         } else if (entry instanceof LongListEntry e) {
             builder.text(label, () -> String.valueOf(current(staged, e, e.getValue())),
-                    v -> parseLong(v).ifPresent(l -> staged.put(e, l)), 20, INT_LIKE);
+                    v -> parseLong(v).ifPresent(l -> staged.put(e, l)), 20, INT_LIKE,
+                    asString(defaultOf(e)));
         } else if (entry instanceof FloatListEntry e) {
             float min = floatOf(plumbing.min(), Float.NEGATIVE_INFINITY);
             float max = floatOf(plumbing.max(), Float.POSITIVE_INFINITY);
             if (Float.isInfinite(min) || Float.isInfinite(max)) {
                 builder.text(label, () -> String.valueOf(current(staged, e, e.getValue())),
-                        v -> parseFloat(v).ifPresent(f -> staged.put(e, f)), 16, NUMBER_LIKE);
+                        v -> parseFloat(v).ifPresent(f -> staged.put(e, f)), 16, NUMBER_LIKE,
+                        asString(defaultOf(e)));
             } else {
                 builder.floatSlider(label, () -> (Float) current(staged, e, e.getValue()),
-                        v -> staged.put(e, v), min, max, step(min, max));
+                        v -> staged.put(e, v), min, max, step(min, max), asFloat(defaultOf(e)));
             }
         } else if (entry instanceof DoubleListEntry e) {
             double min = doubleOf(plumbing.min(), Double.NEGATIVE_INFINITY);
             double max = doubleOf(plumbing.max(), Double.POSITIVE_INFINITY);
             if (Double.isInfinite(min) || Double.isInfinite(max)) {
                 builder.text(label, () -> String.valueOf(current(staged, e, e.getValue())),
-                        v -> parseDouble(v).ifPresent(d -> staged.put(e, d)), 20, NUMBER_LIKE);
+                        v -> parseDouble(v).ifPresent(d -> staged.put(e, d)), 20, NUMBER_LIKE,
+                        asString(defaultOf(e)));
             } else {
                 builder.doubleSlider(label, () -> (Double) current(staged, e, e.getValue()),
-                        v -> staged.put(e, v), min, max, step(min, max));
+                        v -> staged.put(e, v), min, max, step(min, max), asDouble(defaultOf(e)));
             }
         } else if (entry instanceof StringListEntry e) {
             builder.text(label, () -> (String) current(staged, e, e.getValue()),
-                    v -> staged.put(e, v), 256);
+                    v -> staged.put(e, v), 256, asString(defaultOf(e)));
         } else if (entry instanceof StringListListEntry e) {
             // The list editor becomes a multi-line text area, one item per line. Items keep
             // their order and are rebuilt from the lines on every edit; empty lists come back
@@ -394,15 +404,24 @@ public final class ClothBridge {
             List<String> value = e.getValue();
             builder.stringList(label,
                     () -> stringListOf(staged, e, value),
-                    v -> staged.put(e, v));
+                    v -> staged.put(e, v),
+                    asStringList(defaultOf(e)));
         } else if (entry instanceof IntegerListListEntry e) {
-            addLinesList(builder, label, e, staged, ClothBridge::boxedInt);
-        } else if (entry instanceof LongListListEntry e) {
-            addLinesList(builder, label, e, staged, ClothBridge::boxedLong);
+            builder.intList(label,
+                    () -> listOf(staged, e, e.getValue(), n -> ((Number) n).intValue()),
+                    v -> staged.put(e, v), asIntList(defaultOf(e)));
         } else if (entry instanceof FloatListListEntry e) {
-            addLinesList(builder, label, e, staged, ClothBridge::parseFloat);
+            builder.floatList(label,
+                    () -> listOf(staged, e, e.getValue(), n -> ((Number) n).floatValue()),
+                    v -> staged.put(e, v), asFloatList(defaultOf(e)));
         } else if (entry instanceof DoubleListListEntry e) {
-            addLinesList(builder, label, e, staged, ClothBridge::parseDouble);
+            builder.doubleList(label,
+                    () -> listOf(staged, e, e.getValue(), n -> ((Number) n).doubleValue()),
+                    v -> staged.put(e, v), asDoubleList(defaultOf(e)));
+        } else if (entry instanceof LongListListEntry e) {
+            // Fayber has no long list editor: same one-item-per-line text area as the native
+            // number lists, parsed to Long so the erased Cloth consumer receives its type.
+            addLinesList(builder, label, e, staged, ClothBridge::boxedLong);
         } else if (entry instanceof EnumListEntry<?> e) {
             // Only EnumListEntry, not its SelectionListEntry parent: Cloth fills an enum entry with
             // every constant of the type, but a plain SelectionListEntry may hold an arbitrary
@@ -454,13 +473,14 @@ public final class ClothBridge {
         return simple.isEmpty() ? entry.getClass().getName() : simple;
     }
 
-    private static void addCycle(FayberConfigScreen.Builder builder, String label, Object entry,
+    private static void addCycle(FayberConfigScreen.Builder builder, String label, AbstractConfigListEntry<?> entry,
                                  Object[] values, Map<Object, Object> staged) {
         builder.cycle(label,
                 () -> current(staged, entry, ((me.shedaniel.clothconfig2.api.ValueHolder<?>) entry).getValue()),
                 v -> staged.put(entry, v),
                 values,
-                ClothBridge::displayName);
+                ClothBridge::displayName,
+                defaultOf(entry));
     }
 
     /** The staged edit if the user changed this entry, otherwise Cloth's own current value. */
@@ -510,7 +530,99 @@ public final class ClothBridge {
                         parsed.add(element.get());
                     }
                     staged.put(entry, parsed);
-                });
+                },
+                asStringList(defaultOf(entry)));
+    }
+
+    /**
+     * The entry's declared default, or null when Cloth does not expose one. Read defensively:
+     * default suppliers are consumer code and may assume a live screen; a failure only costs
+     * this entry its reset button, never the whole translation.
+     */
+    @Nullable
+    private static Object defaultOf(AbstractConfigListEntry<?> entry) {
+        try {
+            return entry.getDefaultValue().orElse(null);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private static @Nullable Boolean asBoolean(@Nullable Object value) {
+        return value instanceof Boolean b ? b : null;
+    }
+
+    private static @Nullable Integer asInt(@Nullable Object value) {
+        return value instanceof Number n ? n.intValue() : null;
+    }
+
+    private static @Nullable Float asFloat(@Nullable Object value) {
+        return value instanceof Number n ? n.floatValue() : null;
+    }
+
+    private static @Nullable Double asDouble(@Nullable Object value) {
+        return value instanceof Number n ? n.doubleValue() : null;
+    }
+
+    private static @Nullable String asString(@Nullable Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private static @Nullable String asHex(@Nullable Object value) {
+        return value instanceof Number n ? hexOf(n) : null;
+    }
+
+    /** A Cloth default list as display lines; null when the default is not a list. */
+    private static @Nullable List<String> asStringList(@Nullable Object value) {
+        if (!(value instanceof List<?> list)) {
+            return null;
+        }
+        List<String> out = new ArrayList<>(list.size());
+        for (Object element : list) {
+            out.add(String.valueOf(element));
+        }
+        return out;
+    }
+
+    private static @Nullable List<Integer> asIntList(@Nullable Object value) {
+        return asNumberList(value, Number::intValue);
+    }
+
+    private static @Nullable List<Float> asFloatList(@Nullable Object value) {
+        return asNumberList(value, Number::floatValue);
+    }
+
+    private static @Nullable List<Double> asDoubleList(@Nullable Object value) {
+        return asNumberList(value, Number::doubleValue);
+    }
+
+    /** A Cloth default list mapped to a native editor's element type; null on any non-number. */
+    private static <T> @Nullable List<T> asNumberList(@Nullable Object value,
+                                                      java.util.function.Function<Number, T> map) {
+        if (!(value instanceof List<?> list)) {
+            return null;
+        }
+        List<T> out = new ArrayList<>(list.size());
+        for (Object element : list) {
+            if (!(element instanceof Number n)) {
+                return null;
+            }
+            out.add(map.apply(n));
+        }
+        return out;
+    }
+
+    /** The staged list or Cloth's own, element-mapped to the native editor's element type. */
+    private static <T> List<T> listOf(Map<Object, Object> staged, Object entry, @Nullable Object fallback,
+                                      java.util.function.Function<Object, T> map) {
+        Object value = staged.get(entry);
+        List<?> raw = value instanceof List<?> stagedList ? stagedList
+                : fallback instanceof List<?> fallbackList ? fallbackList : List.of();
+        List<T> out = new ArrayList<>(raw.size());
+        for (Object element : raw) {
+            out.add(map.apply(element));
+        }
+        return out;
     }
 
     /** Cloth bind to toolkit code: GLFW keycodes as-is, mouse buttons at 1000 + button. */
@@ -700,12 +812,7 @@ public final class ClothBridge {
         }
     }
 
-    /** Same parses, boxed: the staged lists must carry the element type the erased consumers expect. */
-    private static java.util.Optional<?> boxedInt(String text) {
-        java.util.OptionalInt parsed = parseInt(text);
-        return parsed.isPresent() ? java.util.Optional.of(parsed.getAsInt()) : java.util.Optional.empty();
-    }
-
+    /** Same parse, boxed: the staged list must carry the element type the erased consumer expects. */
     private static java.util.Optional<?> boxedLong(String text) {
         java.util.OptionalLong parsed = parseLong(text);
         return parsed.isPresent() ? java.util.Optional.of(parsed.getAsLong()) : java.util.Optional.empty();

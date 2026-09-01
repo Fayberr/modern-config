@@ -3,7 +3,10 @@ package net.fayber.fayberconfig.api;
 import net.fayber.faybergui.render.Theme;
 import net.fayber.faybergui.render.Ui;
 import net.fayber.faybergui.widget.CycleButton;
+import net.fayber.faybergui.widget.Dropdown;
 import net.fayber.faybergui.widget.FlatButton;
+import net.fayber.faybergui.widget.Icons;
+import net.fayber.faybergui.widget.IconButton;
 import net.fayber.faybergui.widget.KeybindField;
 import net.fayber.faybergui.widget.PillToggle;
 import net.fayber.faybergui.widget.TextArea;
@@ -15,6 +18,7 @@ import net.minecraft.network.chat.Component;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -29,6 +33,11 @@ import org.jetbrains.annotations.Nullable;
  * read and write through consumer-supplied getter/setter functions (live preview), and snapshot
  * their old value when the screen opens so Cancel/ESC can restore it.
  *
+ * <p>Options may declare a default value (through the Builder's overloads). A declared default
+ * adds a reset button to the option's card, shown while the current value differs from the
+ * default; clicking it writes the default through the setter, so it previews live and
+ * Cancel/ESC still restores the value the screen opened with.
+ *
  * <p>Entries are created through {@link FayberConfigScreen.Builder}; each builder method returns
  * the entry handle for chaining {@code .tooltip(...)}.
  */
@@ -39,6 +48,8 @@ public interface ConfigEntry {
     /** Input field metrics, sized to sit inside a {@link ConfigEntryList#CARD_HEIGHT} card. */
     int FIELD_HEIGHT = 22;
     int FIELD_WIDTH = 132;
+    /** Side length of the per-row reset button. */
+    int RESET_SIZE = 14;
 
     Component label();
 
@@ -58,6 +69,110 @@ public interface ConfigEntry {
     void restore();
 
     ConfigEntryList.Row createRow();
+
+    /**
+     * The reset-to-default affordance for an option row, or null when no default is declared: a
+     * small rotate-ccw icon button that applies the default through {@code applyDefault}. The
+     * write follows the same path as a user edit, so it previews live and Cancel/ESC still
+     * restores the value the screen opened with. The button is visible only while the current
+     * value differs from the default.
+     *
+     * @param defaultValue the declared default; null means the option has none
+     */
+    static <T> ConfigEntryList.Reset resetOf(@Nullable T defaultValue, Supplier<T> currentValue,
+                                             Consumer<T> applyDefault) {
+        if (defaultValue == null) {
+            return null;
+        }
+        IconButton button = new IconButton(0, 0, RESET_SIZE, Icons.ROTATE_CCW,
+                () -> applyDefault.accept(defaultValue))
+                .theme(THEME)
+                .tooltip("Reset to default");
+        return new ConfigEntryList.Reset(button, () -> !Objects.equals(currentValue.get(), defaultValue));
+    }
+
+    // ------------------------------------------------------------------ colour text helpers
+
+    /** Hex text shape accepted by {@link Color}: an optional hash, then up to 8 hex digits. */
+    Predicate<String> COLOR_TEXT = s -> s.matches("#?[0-9a-fA-F]{0,8}");
+
+    /** An ARGB colour as hex text; 6 digits when fully opaque, 8 otherwise. */
+    static String hexOf(int argb) {
+        return (argb >>> 24) == 0xFF
+                ? String.format("#%06X", argb & 0xFFFFFF)
+                : String.format("#%08X", argb);
+    }
+
+    /** Parses "#RRGGBB" (opaque) or "#AARRGGBB"; the hash is optional. Empty when unparseable. */
+    static java.util.OptionalInt parseHexColor(String text) {
+        String hex = text.trim();
+        if (hex.startsWith("#")) {
+            hex = hex.substring(1);
+        }
+        if (hex.length() != 6 && hex.length() != 8) {
+            return java.util.OptionalInt.empty();
+        }
+        try {
+            int value = (int) Long.parseLong(hex, 16);
+            return java.util.OptionalInt.of(hex.length() == 6 ? value | 0xFF000000 : value);
+        } catch (NumberFormatException e) {
+            return java.util.OptionalInt.empty();
+        }
+    }
+
+    /**
+     * Splits list-editor text into elements, one per line: blank lines are skipped and any line
+     * that does not parse makes the whole edit fail (null), so a half-typed number never
+     * reaches the setter.
+     */
+    static <T> @Nullable List<T> parseLines(String text, Function<String, @Nullable T> parse) {
+        List<T> out = new ArrayList<>();
+        for (String line : text.split("\n", -1)) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            T value = parse.apply(trimmed);
+            if (value == null) {
+                return null;
+            }
+            out.add(value);
+        }
+        return out;
+    }
+
+    /** A number list as list-editor text, one value per line. */
+    static String joinLines(List<? extends Number> values) {
+        List<String> lines = new ArrayList<>(values.size());
+        for (Number value : values) {
+            lines.add(String.valueOf(value));
+        }
+        return String.join("\n", lines);
+    }
+
+    static @Nullable Integer parseIntOrNull(String text) {
+        try {
+            return Integer.valueOf(text);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    static @Nullable Float parseFloatOrNull(String text) {
+        try {
+            return Float.parseFloat(text);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    static @Nullable Double parseDoubleOrNull(String text) {
+        try {
+            return Double.parseDouble(text);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
 
     /** Category header; not an option. */
     final class Header implements ConfigEntry {
@@ -138,13 +253,21 @@ public interface ConfigEntry {
         private final Component label;
         private final Supplier<Boolean> getter;
         private final Consumer<Boolean> setter;
+        @Nullable
+        private final Boolean defaultValue;
         private Component tooltip;
         private Boolean oldValue;
 
         public Bool(String label, Supplier<Boolean> getter, Consumer<Boolean> setter) {
+            this(label, getter, setter, null);
+        }
+
+        public Bool(String label, Supplier<Boolean> getter, Consumer<Boolean> setter,
+                    @Nullable Boolean defaultValue) {
             this.label = Component.literal(label);
             this.getter = getter;
             this.setter = setter;
+            this.defaultValue = defaultValue;
         }
 
         public Bool tooltip(String tooltip) {
@@ -175,7 +298,8 @@ public interface ConfigEntry {
         @Override
         public ConfigEntryList.Row createRow() {
             return new ConfigEntryList.WidgetRow(this.label, this.tooltip,
-                    new PillToggle(0, 0, this.getter, this.setter));
+                    new PillToggle(0, 0, this.getter, this.setter),
+                    resetOf(this.defaultValue, this.getter, this.setter));
         }
     }
 
@@ -187,16 +311,24 @@ public interface ConfigEntry {
         private final int min;
         private final int max;
         private final int step;
+        @Nullable
+        private final Integer defaultValue;
         private Component tooltip;
         private Integer oldValue;
 
         public IntSlider(String label, IntSupplier getter, IntConsumer setter, int min, int max, int step) {
+            this(label, getter, setter, min, max, step, null);
+        }
+
+        public IntSlider(String label, IntSupplier getter, IntConsumer setter, int min, int max, int step,
+                         @Nullable Integer defaultValue) {
             this.label = Component.literal(label);
             this.getter = getter;
             this.setter = setter;
             this.min = min;
             this.max = max;
             this.step = step;
+            this.defaultValue = defaultValue;
         }
 
         public IntSlider tooltip(String tooltip) {
@@ -227,7 +359,8 @@ public interface ConfigEntry {
         @Override
         public ConfigEntryList.Row createRow() {
             return new ConfigEntryList.SliderRow(new net.fayber.faybergui.widget.IntSlider(0, 0, 100,
-                    this.label, this.min, this.max, this.step, this.getter, this.setter));
+                            this.label, this.min, this.max, this.step, this.getter, this.setter),
+                    resetOf(this.defaultValue, this.getter::getAsInt, this.setter::accept));
         }
     }
 
@@ -239,16 +372,24 @@ public interface ConfigEntry {
         private final float min;
         private final float max;
         private final float step;
+        @Nullable
+        private final Float defaultValue;
         private Component tooltip;
         private Float oldValue;
 
         public FloatSlider(String label, Supplier<Float> getter, Consumer<Float> setter, float min, float max, float step) {
+            this(label, getter, setter, min, max, step, null);
+        }
+
+        public FloatSlider(String label, Supplier<Float> getter, Consumer<Float> setter, float min, float max, float step,
+                           @Nullable Float defaultValue) {
             this.label = Component.literal(label);
             this.getter = getter;
             this.setter = setter;
             this.min = min;
             this.max = max;
             this.step = step;
+            this.defaultValue = defaultValue;
         }
 
         public FloatSlider tooltip(String tooltip) {
@@ -279,7 +420,8 @@ public interface ConfigEntry {
         @Override
         public ConfigEntryList.Row createRow() {
             return new ConfigEntryList.SliderRow(new net.fayber.faybergui.widget.FloatSlider(0, 0, 100,
-                    this.label, this.min, this.max, this.step, this.getter, this.setter));
+                            this.label, this.min, this.max, this.step, this.getter, this.setter),
+                    resetOf(this.defaultValue, this.getter, this.setter));
         }
     }
 
@@ -291,16 +433,24 @@ public interface ConfigEntry {
         private final double min;
         private final double max;
         private final double step;
+        @Nullable
+        private final Double defaultValue;
         private Component tooltip;
         private Double oldValue;
 
         public DoubleSlider(String label, Supplier<Double> getter, Consumer<Double> setter, double min, double max, double step) {
+            this(label, getter, setter, min, max, step, null);
+        }
+
+        public DoubleSlider(String label, Supplier<Double> getter, Consumer<Double> setter, double min, double max, double step,
+                            @Nullable Double defaultValue) {
             this.label = Component.literal(label);
             this.getter = getter;
             this.setter = setter;
             this.min = min;
             this.max = max;
             this.step = step;
+            this.defaultValue = defaultValue;
         }
 
         public DoubleSlider tooltip(String tooltip) {
@@ -331,7 +481,8 @@ public interface ConfigEntry {
         @Override
         public ConfigEntryList.Row createRow() {
             return new ConfigEntryList.SliderRow(new net.fayber.faybergui.widget.DoubleSlider(0, 0, 100,
-                    this.label, this.min, this.max, this.step, this.getter, this.setter));
+                            this.label, this.min, this.max, this.step, this.getter, this.setter),
+                    resetOf(this.defaultValue, this.getter, this.setter));
         }
     }
 
@@ -344,20 +495,33 @@ public interface ConfigEntry {
         /** Marks non-conforming input with the error colour; null accepts anything. */
         @Nullable
         private final Predicate<String> validator;
+        @Nullable
+        private final String defaultValue;
         private Component tooltip;
         private String oldValue;
 
         public Text(String label, Supplier<String> getter, Consumer<String> setter, int maxLength) {
-            this(label, getter, setter, maxLength, null);
+            this(label, getter, setter, maxLength, null, null);
         }
 
         public Text(String label, Supplier<String> getter, Consumer<String> setter, int maxLength,
                     @Nullable Predicate<String> validator) {
+            this(label, getter, setter, maxLength, validator, null);
+        }
+
+        public Text(String label, Supplier<String> getter, Consumer<String> setter, int maxLength,
+                    @Nullable String defaultValue) {
+            this(label, getter, setter, maxLength, null, defaultValue);
+        }
+
+        public Text(String label, Supplier<String> getter, Consumer<String> setter, int maxLength,
+                    @Nullable Predicate<String> validator, @Nullable String defaultValue) {
             this.label = Component.literal(label);
             this.getter = getter;
             this.setter = setter;
             this.maxLength = maxLength;
             this.validator = validator;
+            this.defaultValue = defaultValue;
         }
 
         public Text tooltip(String tooltip) {
@@ -399,7 +563,73 @@ public interface ConfigEntry {
             if (this.validator != null) {
                 field.validator(this.validator);
             }
-            return new ConfigEntryList.WidgetRow(this.label, this.tooltip, field);
+            // TextField.value fires the responder, which runs the setter: one call both
+            // repaints the field and writes the default through.
+            return new ConfigEntryList.WidgetRow(this.label, this.tooltip, field,
+                    resetOf(this.defaultValue, this.getter, field::value));
+        }
+    }
+
+    /**
+     * ARGB colour option edited as hex text: "#RRGGBB" (opaque) or "#AARRGGBB", with or without
+     * the leading hash. A live swatch left of the field tracks the last valid value while
+     * typing; half-typed input is marked invalid and never written through.
+     */
+    final class Color implements ConfigEntry {
+        private final Component label;
+        private final IntSupplier getter;
+        private final IntConsumer setter;
+        @Nullable
+        private final Integer defaultValue;
+        private Component tooltip;
+        private Integer oldValue;
+
+        public Color(String label, IntSupplier getter, IntConsumer setter) {
+            this(label, getter, setter, null);
+        }
+
+        public Color(String label, IntSupplier getter, IntConsumer setter, @Nullable Integer defaultValue) {
+            this.label = Component.literal(label);
+            this.getter = getter;
+            this.setter = setter;
+            this.defaultValue = defaultValue;
+        }
+
+        public Color tooltip(String tooltip) {
+            this.tooltip = Component.literal(tooltip);
+            return this;
+        }
+
+        @Override
+        public Component label() {
+            return this.label;
+        }
+
+        @Override
+        public Component tooltip() {
+            return this.tooltip;
+        }
+
+        @Override
+        public void snapshot() {
+            this.oldValue = this.getter.getAsInt();
+        }
+
+        @Override
+        public void restore() {
+            this.setter.accept(this.oldValue);
+        }
+
+        @Override
+        public ConfigEntryList.Row createRow() {
+            TextField field = new TextField(0, 0, 110, FIELD_HEIGHT)
+                    .theme(THEME)
+                    .maxLength(10)
+                    .value(hexOf(this.getter.getAsInt()))
+                    .validator(COLOR_TEXT)
+                    .onChanged(text -> parseHexColor(text).ifPresent(this.setter::accept));
+            return new ConfigEntryList.ColorRow(this.label, this.tooltip, field, this.getter::getAsInt,
+                    resetOf(this.defaultValue, this.getter::getAsInt, value -> field.value(hexOf(value))));
         }
     }
 
@@ -410,16 +640,24 @@ public interface ConfigEntry {
         private final Consumer<T> setter;
         private final T[] values;
         private final Function<T, String> namer;
+        @Nullable
+        private final T defaultValue;
         private Component tooltip;
         private T oldValue;
 
         public Cycle(String label, Supplier<T> getter, Consumer<T> setter, T[] values,
                      Function<T, String> namer) {
+            this(label, getter, setter, values, namer, null);
+        }
+
+        public Cycle(String label, Supplier<T> getter, Consumer<T> setter, T[] values,
+                     Function<T, String> namer, @Nullable T defaultValue) {
             this.label = Component.literal(label);
             this.getter = getter;
             this.setter = setter;
             this.values = values;
             this.namer = namer;
+            this.defaultValue = defaultValue;
         }
 
         public Cycle<T> tooltip(String tooltip) {
@@ -450,7 +688,89 @@ public interface ConfigEntry {
         @Override
         public ConfigEntryList.Row createRow() {
             return new ConfigEntryList.WidgetRow(this.label, this.tooltip,
-                    new CycleButton<>(0, 0, 20, this.getter, this.setter, this.values, this.namer));
+                    new CycleButton<>(0, 0, 20, this.getter, this.setter, this.values, this.namer),
+                    resetOf(this.defaultValue, this.getter, this.setter));
+        }
+    }
+
+    /**
+     * Fixed set of values picked from a dropdown menu: the other presentation for enums and
+     * modes, next to {@link Cycle}. Cycles step through values on click; a dropdown opens a
+     * menu, which reads better for long value lists.
+     */
+    final class Select<T> implements ConfigEntry {
+        private final Component label;
+        private final Supplier<T> getter;
+        private final Consumer<T> setter;
+        private final T[] values;
+        private final Function<T, String> namer;
+        @Nullable
+        private final T defaultValue;
+        private Component tooltip;
+        private T oldValue;
+
+        public Select(String label, Supplier<T> getter, Consumer<T> setter, T[] values,
+                      Function<T, String> namer) {
+            this(label, getter, setter, values, namer, null);
+        }
+
+        public Select(String label, Supplier<T> getter, Consumer<T> setter, T[] values,
+                      Function<T, String> namer, @Nullable T defaultValue) {
+            this.label = Component.literal(label);
+            this.getter = getter;
+            this.setter = setter;
+            this.values = values;
+            this.namer = namer;
+            this.defaultValue = defaultValue;
+        }
+
+        public Select<T> tooltip(String tooltip) {
+            this.tooltip = Component.literal(tooltip);
+            return this;
+        }
+
+        @Override
+        public Component label() {
+            return this.label;
+        }
+
+        @Override
+        public Component tooltip() {
+            return this.tooltip;
+        }
+
+        @Override
+        public void snapshot() {
+            this.oldValue = this.getter.get();
+        }
+
+        @Override
+        public void restore() {
+            this.setter.accept(this.oldValue);
+        }
+
+        @Override
+        public ConfigEntryList.Row createRow() {
+            List<String> options = new ArrayList<>(this.values.length);
+            for (T value : this.values) {
+                options.add(this.namer.apply(value));
+            }
+            Dropdown dropdown = new Dropdown(0, 0, FIELD_WIDTH, FIELD_HEIGHT, options,
+                    () -> this.indexOf(this.getter.get()),
+                    index -> this.setter.accept(this.values[index]))
+                    .theme(THEME);
+            return new ConfigEntryList.WidgetRow(this.label, this.tooltip, dropdown,
+                    resetOf(this.defaultValue, this.getter, this.setter));
+        }
+
+        /** The option list position of a value, or -1 when it is not among the options. */
+        private int indexOf(T value) {
+            for (int i = 0; i < this.values.length; i++) {
+                if (Objects.equals(this.values[i], value)) {
+                    return i;
+                }
+            }
+            return -1;
         }
     }
 
@@ -463,13 +783,20 @@ public interface ConfigEntry {
         private final Component label;
         private final IntSupplier getter;
         private final IntConsumer setter;
+        @Nullable
+        private final Integer defaultValue;
         private Component tooltip;
         private Integer oldValue;
 
         public Keybind(String label, IntSupplier getter, IntConsumer setter) {
+            this(label, getter, setter, null);
+        }
+
+        public Keybind(String label, IntSupplier getter, IntConsumer setter, @Nullable Integer defaultValue) {
             this.label = Component.literal(label);
             this.getter = getter;
             this.setter = setter;
+            this.defaultValue = defaultValue;
         }
 
         public Keybind tooltip(String tooltip) {
@@ -501,7 +828,8 @@ public interface ConfigEntry {
         public ConfigEntryList.Row createRow() {
             KeybindField field = new KeybindField(0, 0, FIELD_WIDTH, this.getter::getAsInt, this.setter::accept)
                     .theme(THEME);
-            return new ConfigEntryList.WidgetRow(this.label, this.tooltip, field);
+            return new ConfigEntryList.WidgetRow(this.label, this.tooltip, field,
+                    resetOf(this.defaultValue, this.getter::getAsInt, this.setter::accept));
         }
     }
 
@@ -515,13 +843,21 @@ public interface ConfigEntry {
         private final Component label;
         private final Supplier<List<String>> getter;
         private final Consumer<List<String>> setter;
+        @Nullable
+        private final List<String> defaultValue;
         private Component tooltip;
         private List<String> oldValue;
 
         public StringList(String label, Supplier<List<String>> getter, Consumer<List<String>> setter) {
+            this(label, getter, setter, null);
+        }
+
+        public StringList(String label, Supplier<List<String>> getter, Consumer<List<String>> setter,
+                          @Nullable List<String> defaultValue) {
             this.label = Component.literal(label);
             this.getter = getter;
             this.setter = setter;
+            this.defaultValue = defaultValue == null ? null : List.copyOf(defaultValue);
         }
 
         public StringList tooltip(String tooltip) {
@@ -561,7 +897,224 @@ public interface ConfigEntry {
                     .value(String.join("\n", this.getter.get()))
                     .onChanged(text -> this.setter.accept(
                             new ArrayList<>(Arrays.asList(text.split("\n", -1)))));
-            return new ConfigEntryList.TallWidgetRow(this.label, this.tooltip, area);
+            return new ConfigEntryList.TallWidgetRow(this.label, this.tooltip, area,
+                    resetOf(this.defaultValue, this.getter, value -> {
+                        // Unlike TextField, TextArea.value does not fire onChanged, so the reset
+                        // applies the default itself and then repaints the editor.
+                        this.setter.accept(value);
+                        area.value(String.join("\n", value));
+                    }));
+        }
+    }
+
+    /**
+     * List of integers edited one item per line in a {@link TextArea}. Blank lines are skipped;
+     * a line that does not parse leaves the last valid value in place (all-or-nothing, so a
+     * half-typed number never reaches the setter).
+     */
+    final class IntList implements ConfigEntry {
+        private final Component label;
+        private final Supplier<List<Integer>> getter;
+        private final Consumer<List<Integer>> setter;
+        @Nullable
+        private final List<Integer> defaultValue;
+        private Component tooltip;
+        private List<Integer> oldValue;
+
+        public IntList(String label, Supplier<List<Integer>> getter, Consumer<List<Integer>> setter) {
+            this(label, getter, setter, null);
+        }
+
+        public IntList(String label, Supplier<List<Integer>> getter, Consumer<List<Integer>> setter,
+                       @Nullable List<Integer> defaultValue) {
+            this.label = Component.literal(label);
+            this.getter = getter;
+            this.setter = setter;
+            this.defaultValue = defaultValue == null ? null : List.copyOf(defaultValue);
+        }
+
+        public IntList tooltip(String tooltip) {
+            this.tooltip = Component.literal(tooltip);
+            return this;
+        }
+
+        @Override
+        public Component label() {
+            return this.label;
+        }
+
+        @Override
+        public Component tooltip() {
+            return this.tooltip;
+        }
+
+        @Override
+        public void snapshot() {
+            this.oldValue = List.copyOf(this.getter.get());
+        }
+
+        @Override
+        public void restore() {
+            this.setter.accept(this.oldValue);
+        }
+
+        @Override
+        public ConfigEntryList.Row createRow() {
+            int visibleLines = Math.clamp(this.getter.get().size() + 1, 3, 8);
+            int areaHeight = 2 * 8 + visibleLines * Ui.font().lineHeight;
+            TextArea area = new TextArea(0, 0, 100, areaHeight)
+                    .theme(THEME)
+                    .maxLength(4000)
+                    .value(joinLines(this.getter.get()))
+                    .onChanged(text -> {
+                        List<Integer> parsed = parseLines(text, ConfigEntry::parseIntOrNull);
+                        if (parsed != null) {
+                            this.setter.accept(parsed);
+                        }
+                    });
+            return new ConfigEntryList.TallWidgetRow(this.label, this.tooltip, area,
+                    resetOf(this.defaultValue, this.getter, value -> {
+                        this.setter.accept(value);
+                        area.value(joinLines(value));
+                    }));
+        }
+    }
+
+    /** List of floats, edited like {@link IntList}. */
+    final class FloatList implements ConfigEntry {
+        private final Component label;
+        private final Supplier<List<Float>> getter;
+        private final Consumer<List<Float>> setter;
+        @Nullable
+        private final List<Float> defaultValue;
+        private Component tooltip;
+        private List<Float> oldValue;
+
+        public FloatList(String label, Supplier<List<Float>> getter, Consumer<List<Float>> setter) {
+            this(label, getter, setter, null);
+        }
+
+        public FloatList(String label, Supplier<List<Float>> getter, Consumer<List<Float>> setter,
+                         @Nullable List<Float> defaultValue) {
+            this.label = Component.literal(label);
+            this.getter = getter;
+            this.setter = setter;
+            this.defaultValue = defaultValue == null ? null : List.copyOf(defaultValue);
+        }
+
+        public FloatList tooltip(String tooltip) {
+            this.tooltip = Component.literal(tooltip);
+            return this;
+        }
+
+        @Override
+        public Component label() {
+            return this.label;
+        }
+
+        @Override
+        public Component tooltip() {
+            return this.tooltip;
+        }
+
+        @Override
+        public void snapshot() {
+            this.oldValue = List.copyOf(this.getter.get());
+        }
+
+        @Override
+        public void restore() {
+            this.setter.accept(this.oldValue);
+        }
+
+        @Override
+        public ConfigEntryList.Row createRow() {
+            int visibleLines = Math.clamp(this.getter.get().size() + 1, 3, 8);
+            int areaHeight = 2 * 8 + visibleLines * Ui.font().lineHeight;
+            TextArea area = new TextArea(0, 0, 100, areaHeight)
+                    .theme(THEME)
+                    .maxLength(4000)
+                    .value(joinLines(this.getter.get()))
+                    .onChanged(text -> {
+                        List<Float> parsed = parseLines(text, ConfigEntry::parseFloatOrNull);
+                        if (parsed != null) {
+                            this.setter.accept(parsed);
+                        }
+                    });
+            return new ConfigEntryList.TallWidgetRow(this.label, this.tooltip, area,
+                    resetOf(this.defaultValue, this.getter, value -> {
+                        this.setter.accept(value);
+                        area.value(joinLines(value));
+                    }));
+        }
+    }
+
+    /** List of doubles, edited like {@link IntList}. */
+    final class DoubleList implements ConfigEntry {
+        private final Component label;
+        private final Supplier<List<Double>> getter;
+        private final Consumer<List<Double>> setter;
+        @Nullable
+        private final List<Double> defaultValue;
+        private Component tooltip;
+        private List<Double> oldValue;
+
+        public DoubleList(String label, Supplier<List<Double>> getter, Consumer<List<Double>> setter) {
+            this(label, getter, setter, null);
+        }
+
+        public DoubleList(String label, Supplier<List<Double>> getter, Consumer<List<Double>> setter,
+                          @Nullable List<Double> defaultValue) {
+            this.label = Component.literal(label);
+            this.getter = getter;
+            this.setter = setter;
+            this.defaultValue = defaultValue == null ? null : List.copyOf(defaultValue);
+        }
+
+        public DoubleList tooltip(String tooltip) {
+            this.tooltip = Component.literal(tooltip);
+            return this;
+        }
+
+        @Override
+        public Component label() {
+            return this.label;
+        }
+
+        @Override
+        public Component tooltip() {
+            return this.tooltip;
+        }
+
+        @Override
+        public void snapshot() {
+            this.oldValue = List.copyOf(this.getter.get());
+        }
+
+        @Override
+        public void restore() {
+            this.setter.accept(this.oldValue);
+        }
+
+        @Override
+        public ConfigEntryList.Row createRow() {
+            int visibleLines = Math.clamp(this.getter.get().size() + 1, 3, 8);
+            int areaHeight = 2 * 8 + visibleLines * Ui.font().lineHeight;
+            TextArea area = new TextArea(0, 0, 100, areaHeight)
+                    .theme(THEME)
+                    .maxLength(4000)
+                    .value(joinLines(this.getter.get()))
+                    .onChanged(text -> {
+                        List<Double> parsed = parseLines(text, ConfigEntry::parseDoubleOrNull);
+                        if (parsed != null) {
+                            this.setter.accept(parsed);
+                        }
+                    });
+            return new ConfigEntryList.TallWidgetRow(this.label, this.tooltip, area,
+                    resetOf(this.defaultValue, this.getter, value -> {
+                        this.setter.accept(value);
+                        area.value(joinLines(value));
+                    }));
         }
     }
 

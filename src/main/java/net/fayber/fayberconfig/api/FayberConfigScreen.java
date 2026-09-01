@@ -2,6 +2,8 @@ package net.fayber.fayberconfig.api;
 
 import net.fayber.faybergui.render.Theme;
 import net.fayber.faybergui.render.Ui;
+import net.fayber.faybergui.screen.PopupHost;
+import net.fayber.faybergui.widget.Dropdown;
 import net.fayber.faybergui.widget.FlatButton;
 import net.fayber.faybergui.widget.HorizontalScrollPanel;
 import net.fayber.faybergui.widget.Tabs;
@@ -85,6 +87,9 @@ public class FayberConfigScreen extends Screen {
     private ConfigEntryList list;
     /** The rows of the list, parallel to entries; kept so tab switches can toggle visibility. */
     private List<ConfigEntryList.Row> rows = List.of();
+    /** Top layer for dropdown menus (and popups generally); created in init, extracted last. */
+    @Nullable
+    private PopupHost popupHost;
     private int activeTab = 0;
     private boolean closed = false;
 
@@ -147,6 +152,18 @@ public class FayberConfigScreen extends Screen {
         }
         this.rows = rows;
 
+        // Dropdown rows get the popup host so their menus float above every card: without a
+        // host the menu is drawn inline during this row's extraction and every later row's card
+        // paints over it. The host itself is added as a widget further down, after everything
+        // else, so its extraction (and therefore drawing) happens last.
+        this.popupHost = new PopupHost(0, 0, this.width, this.height).theme(this.theme);
+        for (ConfigEntryList.Row row : rows) {
+            Dropdown dropdown = row.dropdown();
+            if (dropdown != null) {
+                dropdown.host(this.popupHost);
+            }
+        }
+
         int buttonY = this.height - buttonH - footerMargin;
         int listH = Math.max(ConfigEntryList.ROW_HEIGHT, buttonY - 12 - listTop);
 
@@ -194,6 +211,39 @@ public class FayberConfigScreen extends Screen {
             corner.theme(this.theme);
             this.addRenderableWidget(corner);
         }
+
+        // Added after every other widget so its extraction (menus, modals) draws above them all.
+        this.addRenderableWidget(this.popupHost);
+    }
+
+    @Override
+    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+        // Front-of-queue: an open dropdown menu swallows clicks inside and outside it.
+        if (this.popupHost != null && this.popupHost.handleClick(event.x(), event.y(), event.button())) {
+            return true;
+        }
+        return super.mouseClicked(event, doubleClick);
+    }
+
+    @Override
+    public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
+        if (this.popupHost != null && this.popupHost.handleKey(event)) {
+            return true;
+        }
+        if (this.popupHost != null && this.popupHost.menusOpen() && event.isEscape()) {
+            // ESC with a dropdown open closes the menu; the screen closes on a second ESC.
+            this.popupHost.closeAllMenus();
+            return true;
+        }
+        return super.keyPressed(event);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double xDelta, double yDelta) {
+        if (this.popupHost != null && this.popupHost.handleScroll(mouseX, mouseY, yDelta)) {
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, xDelta, yDelta);
     }
 
     /** Tab bar callback: shows only the new tab's rows and re-lays the list out from the top. */
@@ -318,8 +368,22 @@ public class FayberConfigScreen extends Screen {
             return this;
         }
 
+        /** Boolean with a declared default; adds a reset-to-default button on the card. */
+        public Builder bool(String label, Supplier<Boolean> getter, Consumer<Boolean> setter,
+                            Boolean defaultValue) {
+            this.addEntry(new ConfigEntry.Bool(label, getter, setter, defaultValue));
+            return this;
+        }
+
         public Builder intSlider(String label, IntSupplier getter, IntConsumer setter, int min, int max, int step) {
             this.addEntry(new ConfigEntry.IntSlider(label, getter, setter, min, max, step));
+            return this;
+        }
+
+        /** Int slider with a declared default; the card gets a reset-to-default button. */
+        public Builder intSlider(String label, IntSupplier getter, IntConsumer setter, int min, int max, int step,
+                                 Integer defaultValue) {
+            this.addEntry(new ConfigEntry.IntSlider(label, getter, setter, min, max, step, defaultValue));
             return this;
         }
 
@@ -328,8 +392,22 @@ public class FayberConfigScreen extends Screen {
             return this;
         }
 
+        /** Float slider with a declared default; the card gets a reset-to-default button. */
+        public Builder floatSlider(String label, Supplier<Float> getter, Consumer<Float> setter, float min, float max, float step,
+                                   Float defaultValue) {
+            this.addEntry(new ConfigEntry.FloatSlider(label, getter, setter, min, max, step, defaultValue));
+            return this;
+        }
+
         public Builder doubleSlider(String label, Supplier<Double> getter, Consumer<Double> setter, double min, double max, double step) {
             this.addEntry(new ConfigEntry.DoubleSlider(label, getter, setter, min, max, step));
+            return this;
+        }
+
+        /** Double slider with a declared default; the card gets a reset-to-default button. */
+        public Builder doubleSlider(String label, Supplier<Double> getter, Consumer<Double> setter, double min, double max, double step,
+                                    Double defaultValue) {
+            this.addEntry(new ConfigEntry.DoubleSlider(label, getter, setter, min, max, step, defaultValue));
             return this;
         }
 
@@ -345,6 +423,35 @@ public class FayberConfigScreen extends Screen {
             return this;
         }
 
+        /** Text field with a declared default; the card gets a reset-to-default button. */
+        public Builder text(String label, Supplier<String> getter, Consumer<String> setter, int maxLength,
+                            String defaultValue) {
+            this.addEntry(new ConfigEntry.Text(label, getter, setter, maxLength, defaultValue));
+            return this;
+        }
+
+        /** Text field with both a validator and a declared default. */
+        public Builder text(String label, Supplier<String> getter, Consumer<String> setter, int maxLength,
+                            Predicate<String> validator, String defaultValue) {
+            this.addEntry(new ConfigEntry.Text(label, getter, setter, maxLength, validator, defaultValue));
+            return this;
+        }
+
+        /**
+         * An ARGB colour option, edited as hex text with a live colour swatch next to the field.
+         * Accepts "#RRGGBB" (opaque) or "#AARRGGBB"; the hash is optional.
+         */
+        public Builder color(String label, IntSupplier getter, IntConsumer setter) {
+            this.addEntry(new ConfigEntry.Color(label, getter, setter));
+            return this;
+        }
+
+        /** Colour option with a declared default; the card gets a reset-to-default button. */
+        public Builder color(String label, IntSupplier getter, IntConsumer setter, Integer defaultValue) {
+            this.addEntry(new ConfigEntry.Color(label, getter, setter, defaultValue));
+            return this;
+        }
+
         /**
          * An option with a fixed set of values, shown as a cycle card that steps through them on
          * click (left forward, right backward). Typical for enums; {@code namer} turns a value
@@ -353,6 +460,31 @@ public class FayberConfigScreen extends Screen {
         public <T> Builder cycle(String label, Supplier<T> getter, Consumer<T> setter, T[] values,
                                  Function<T, String> namer) {
             this.addEntry(new ConfigEntry.Cycle<>(label, getter, setter, values, namer));
+            return this;
+        }
+
+        /** Cycle card with a declared default; the card gets a reset-to-default button. */
+        public <T> Builder cycle(String label, Supplier<T> getter, Consumer<T> setter, T[] values,
+                                 Function<T, String> namer, T defaultValue) {
+            this.addEntry(new ConfigEntry.Cycle<>(label, getter, setter, values, namer, defaultValue));
+            return this;
+        }
+
+        /**
+         * An option with a fixed set of values, shown as a dropdown that opens a menu on click:
+         * the other presentation for enums and modes, next to {@link #cycle}. Reads better for
+         * long value lists; cycles read better for two to four options.
+         */
+        public <T> Builder select(String label, Supplier<T> getter, Consumer<T> setter, T[] values,
+                                  Function<T, String> namer) {
+            this.addEntry(new ConfigEntry.Select<>(label, getter, setter, values, namer));
+            return this;
+        }
+
+        /** Dropdown with a declared default; the card gets a reset-to-default button. */
+        public <T> Builder select(String label, Supplier<T> getter, Consumer<T> setter, T[] values,
+                                  Function<T, String> namer, T defaultValue) {
+            this.addEntry(new ConfigEntry.Select<>(label, getter, setter, values, namer, defaultValue));
             return this;
         }
 
@@ -371,12 +503,67 @@ public class FayberConfigScreen extends Screen {
             return this;
         }
 
+        /** Key bind with a declared default; the card gets a reset-to-default button. */
+        public Builder keybind(String label, IntSupplier getter, IntConsumer setter, Integer defaultValue) {
+            this.addEntry(new ConfigEntry.Keybind(label, getter, setter, defaultValue));
+            return this;
+        }
+
         /**
          * A list of strings edited one item per line in a multi-line text area. Item strings
          * must not contain newlines.
          */
         public Builder stringList(String label, Supplier<List<String>> getter, Consumer<List<String>> setter) {
             this.addEntry(new ConfigEntry.StringList(label, getter, setter));
+            return this;
+        }
+
+        /** String list with a declared default; the card gets a reset-to-default button. */
+        public Builder stringList(String label, Supplier<List<String>> getter, Consumer<List<String>> setter,
+                                  List<String> defaultValue) {
+            this.addEntry(new ConfigEntry.StringList(label, getter, setter, defaultValue));
+            return this;
+        }
+
+        /**
+         * A list of integers edited one item per line in a multi-line text area. Blank lines are
+         * skipped; a line that does not parse leaves the last valid value in place.
+         */
+        public Builder intList(String label, Supplier<List<Integer>> getter, Consumer<List<Integer>> setter) {
+            this.addEntry(new ConfigEntry.IntList(label, getter, setter));
+            return this;
+        }
+
+        /** Int list with a declared default; the card gets a reset-to-default button. */
+        public Builder intList(String label, Supplier<List<Integer>> getter, Consumer<List<Integer>> setter,
+                               List<Integer> defaultValue) {
+            this.addEntry(new ConfigEntry.IntList(label, getter, setter, defaultValue));
+            return this;
+        }
+
+        /** A list of floats, edited like {@link #intList}. */
+        public Builder floatList(String label, Supplier<List<Float>> getter, Consumer<List<Float>> setter) {
+            this.addEntry(new ConfigEntry.FloatList(label, getter, setter));
+            return this;
+        }
+
+        /** Float list with a declared default; the card gets a reset-to-default button. */
+        public Builder floatList(String label, Supplier<List<Float>> getter, Consumer<List<Float>> setter,
+                                 List<Float> defaultValue) {
+            this.addEntry(new ConfigEntry.FloatList(label, getter, setter, defaultValue));
+            return this;
+        }
+
+        /** A list of doubles, edited like {@link #intList}. */
+        public Builder doubleList(String label, Supplier<List<Double>> getter, Consumer<List<Double>> setter) {
+            this.addEntry(new ConfigEntry.DoubleList(label, getter, setter));
+            return this;
+        }
+
+        /** Double list with a declared default; the card gets a reset-to-default button. */
+        public Builder doubleList(String label, Supplier<List<Double>> getter, Consumer<List<Double>> setter,
+                                  List<Double> defaultValue) {
+            this.addEntry(new ConfigEntry.DoubleList(label, getter, setter, defaultValue));
             return this;
         }
 

@@ -21,10 +21,12 @@ A client-side config mod with a dark, rounded-card settings UI: one scrolling co
 
 ## Screens
 
-- Every option is a card: pill toggles, sliders, text fields, cycle buttons, keybind capture fields, string list editors and action buttons.
+- Every option is a card: pill toggles, sliders, text fields, cycle buttons, dropdowns, keybind capture fields, list editors and action buttons.
+- Options that declare a default get a reset button, shown while the value differs from it.
 - Changes preview live while the screen is open; Cancel and ESC restore the values the screen opened with.
 - Tabs split large configs into pages; the tab strip scrolls when there are more tabs than fit.
 - Tooltips on every option that declares one.
+- The `/fayberconfig demo` command opens a screen with one of every option type.
 
 ## Cloth Config bridge
 
@@ -32,6 +34,6 @@ When Cloth Config is installed, its screens are translated into the same look in
 
 ## For mod developers
 
-- Builder API: `FayberConfigScreen.builder()` with tabs, category headers, booleans, int, float and double sliders, text fields, cycles, buttons, keybinds, string lists, notes and corner buttons.
+- Builder API: `FayberConfigScreen.builder()` with tabs, category headers, booleans, int, float and double sliders, text fields, colors, cycles, dropdowns, buttons, keybinds, string and number lists, notes and corner buttons. Optional default values on options add reset-to-default buttons.
 - Requires the Fayber GUI library as a separate dependency; the only other dependency is Fabric API.
 - GPL-3.0-or-later.
