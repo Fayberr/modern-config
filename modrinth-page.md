@@ -44,6 +44,7 @@ ModernConfigScreen.builder(title, parent, onSave)
 ```
 
 - Colors, cycles, dropdowns, keybinds, string and number lists, text fields, notes and corner buttons are also in the builder. Optional default values add reset-to-default buttons.
+- Every text has a String overload and a Component overload (labels, tooltips, tab and category names, notes, cycle and select value names). Pass `Component.translatable("mykey")` and it re-resolves against the player's language whenever it is drawn.
 - Decorate the option added just before: `.tooltip(...)` for hover help, `.requiresRestart()` for a Restart badge, `.enabledWhen(condition)` to grey the row out and ignore its input while a condition is false, and `.error(supplier)` for a red border and a message in the tooltip while validation fails.
 - Setters run on every input, so changes preview live while the screen is open. Options snapshot when the screen opens; Cancel or ESC restores them, and Save runs your onSave.
 - Existing builder calls keep working across all 1.x releases; new options arrive as additional methods.

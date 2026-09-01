@@ -41,6 +41,10 @@ import org.jetbrains.annotations.Nullable;
  * {@code .error(...)}). A screen with tabs shows one tab's entries at a time in the scrolling
  * column, like the tab strip Cloth Config draws for multi-category configs.
  *
+ * <p>Every text the screen shows (labels, tooltips, tab and category names, notes, corner
+ * button) has a String overload and a {@link Component} overload; the component is stored as
+ * given, so translatables resolve against the current language whenever the text is drawn.
+ *
  * <p>Layout is done by hand rather than with {@code HeaderAndFooterLayout} because everything has
  * to line up with the centred column, not the window: the list is positioned explicitly with
  * {@code updateSizeAndPosition(width, height, x, y)}, and the list is wider than the cards so the
@@ -70,7 +74,7 @@ public class ModernConfigScreen extends Screen {
     /** Parallel to entries: the Builder's per-option decorations (restart badge, condition, error). */
     private final List<ConfigEntryList.OptionState> optionStates;
     /** Tab labels, in order; empty when the screen has no tabs and one flat list. */
-    private final List<String> tabLabels;
+    private final List<Component> tabLabels;
     /** Parallel to entries: the tab index each entry belongs to, or -1 for always visible. */
     private final List<Integer> tabOfEntries;
     /** Small secondary action pinned to the true bottom right corner, outside the card column. */
@@ -82,7 +86,10 @@ public class ModernConfigScreen extends Screen {
      * from the entry list so screens can offer an escape hatch (like the bridge's "Use original
      * menu") without it scrolling away as a card row.
      */
-    public record CornerButton(String label, Runnable action) {
+    public record CornerButton(Component label, Runnable action) {
+        public CornerButton(String label, Runnable action) {
+            this(Component.literal(label), action);
+        }
     }
 
     /** The modern-gui palette; the default is the same neutral ramp 1.0.x drew with. */
@@ -104,7 +111,7 @@ public class ModernConfigScreen extends Screen {
     ModernConfigScreen(Component title, @Nullable Screen parent, @Nullable Runnable onSave,
                        List<ConfigEntry> entries, List<ConfigEntryList.OptionState> optionStates,
                        @Nullable CornerButton cornerButton,
-                       List<String> tabLabels, List<Integer> tabOfEntries) {
+                       List<Component> tabLabels, List<Integer> tabOfEntries) {
         // Kept raw: the Inter variant depends on the GUI scale, so it is applied at draw time.
         super(title);
         this.parent = parent;
@@ -200,17 +207,18 @@ public class ModernConfigScreen extends Screen {
         }
 
         int buttonW = (this.columnW - buttonGap) / 2;
+        // Translatable footer labels: FlatButton renders the component every frame.
         this.addRenderableWidget(new FlatButton(this.columnX, buttonY, buttonW, buttonH,
-                Component.literal("Cancel"), this::onClose, FlatButton.Style.GHOST));
+                Component.translatable("modernconfig.cancel"), this::onClose, FlatButton.Style.GHOST));
         this.addRenderableWidget(new FlatButton(this.columnX + this.columnW - buttonW, buttonY, buttonW, buttonH,
-                Component.literal("Save"), this::saveAndClose, FlatButton.Style.PRIMARY));
+                Component.translatable("modernconfig.save"), this::saveAndClose, FlatButton.Style.PRIMARY));
 
         if (this.cornerButton != null) {
             int w = Math.max(60, this.minecraft.font.width(this.cornerButton.label()) + 16);
             int h = compact ? 16 : 18;
             int x = this.width - w - (compact ? 6 : 8);
             int y = this.height - h - (compact ? 4 : 6);
-            FlatButton corner = new FlatButton(x, y, w, h, Component.literal(this.cornerButton.label()),
+            FlatButton corner = new FlatButton(x, y, w, h, this.cornerButton.label(),
                     this.cornerButton.action(), FlatButton.Style.GHOST);
             corner.theme(this.theme);
             this.addRenderableWidget(corner);
@@ -316,7 +324,7 @@ public class ModernConfigScreen extends Screen {
         private final List<ConfigEntry> entries = new ArrayList<>();
         /** Parallel to entries: decorations attached to each one, DEFAULT until one is touched. */
         private final List<ConfigEntryList.OptionState> states = new ArrayList<>();
-        private final List<String> tabs = new ArrayList<>();
+        private final List<Component> tabs = new ArrayList<>();
         /** Parallel to entries: the tab each entry was added under, or -1 before the first tab. */
         private final List<Integer> tabOfEntries = new ArrayList<>();
         private int currentTab = -1;
@@ -331,6 +339,11 @@ public class ModernConfigScreen extends Screen {
 
         /** Starts a new tab; subsequent entries and category headers belong to it. */
         public Builder tab(String label) {
+            return this.tab(Component.literal(label));
+        }
+
+        /** Component variant of {@link #tab(String)}; a translatable label resolves at draw time. */
+        public Builder tab(Component label) {
             this.tabs.add(label);
             this.currentTab = this.tabs.size() - 1;
             return this;
@@ -402,11 +415,23 @@ public class ModernConfigScreen extends Screen {
             return this;
         }
 
+        /** Component variant of {@link #category(String)}; a translatable name resolves at draw time. */
+        public Builder category(Component name) {
+            this.addEntry(new ConfigEntry.Header(name));
+            return this;
+        }
+
         /**
          * Adds a static paragraph of documentation text (no value, not interactive). Rendered as
          * wrapped secondary text between the cards; the row grows with the wrapped line count.
          */
         public Builder note(String text) {
+            this.addEntry(new ConfigEntry.Note(text));
+            return this;
+        }
+
+        /** Component variant of {@link #note(String)}; a translatable text resolves at draw time. */
+        public Builder note(Component text) {
             this.addEntry(new ConfigEntry.Note(text));
             return this;
         }
@@ -422,7 +447,21 @@ public class ModernConfigScreen extends Screen {
             return this;
         }
 
+        /** Component variant of {@link #tooltip(String)}; a translatable tooltip resolves when it renders. */
+        public Builder tooltip(Component tooltip) {
+            if (!this.entries.isEmpty()) {
+                this.entries.get(this.entries.size() - 1).tooltip(tooltip);
+            }
+            return this;
+        }
+
         public Builder bool(String label, Supplier<Boolean> getter, Consumer<Boolean> setter) {
+            this.addEntry(new ConfigEntry.Bool(label, getter, setter));
+            return this;
+        }
+
+        /** Component variant of {@link #bool(String, Supplier, Consumer)}; a translatable label resolves at draw time. */
+        public Builder bool(Component label, Supplier<Boolean> getter, Consumer<Boolean> setter) {
             this.addEntry(new ConfigEntry.Bool(label, getter, setter));
             return this;
         }
@@ -434,7 +473,20 @@ public class ModernConfigScreen extends Screen {
             return this;
         }
 
+        /** Component variant with a declared default; a translatable label resolves at draw time. */
+        public Builder bool(Component label, Supplier<Boolean> getter, Consumer<Boolean> setter,
+                            Boolean defaultValue) {
+            this.addEntry(new ConfigEntry.Bool(label, getter, setter, defaultValue));
+            return this;
+        }
+
         public Builder intSlider(String label, IntSupplier getter, IntConsumer setter, int min, int max, int step) {
+            this.addEntry(new ConfigEntry.IntSlider(label, getter, setter, min, max, step));
+            return this;
+        }
+
+        /** Component variant of {@link #intSlider(String, IntSupplier, IntConsumer, int, int, int)}; a translatable label resolves at draw time. */
+        public Builder intSlider(Component label, IntSupplier getter, IntConsumer setter, int min, int max, int step) {
             this.addEntry(new ConfigEntry.IntSlider(label, getter, setter, min, max, step));
             return this;
         }
@@ -446,7 +498,20 @@ public class ModernConfigScreen extends Screen {
             return this;
         }
 
+        /** Component variant with a declared default; a translatable label resolves at draw time. */
+        public Builder intSlider(Component label, IntSupplier getter, IntConsumer setter, int min, int max, int step,
+                                 Integer defaultValue) {
+            this.addEntry(new ConfigEntry.IntSlider(label, getter, setter, min, max, step, defaultValue));
+            return this;
+        }
+
         public Builder floatSlider(String label, Supplier<Float> getter, Consumer<Float> setter, float min, float max, float step) {
+            this.addEntry(new ConfigEntry.FloatSlider(label, getter, setter, min, max, step));
+            return this;
+        }
+
+        /** Component variant of {@link #floatSlider(String, Supplier, Consumer, float, float, float)}; a translatable label resolves at draw time. */
+        public Builder floatSlider(Component label, Supplier<Float> getter, Consumer<Float> setter, float min, float max, float step) {
             this.addEntry(new ConfigEntry.FloatSlider(label, getter, setter, min, max, step));
             return this;
         }
@@ -458,7 +523,20 @@ public class ModernConfigScreen extends Screen {
             return this;
         }
 
+        /** Component variant with a declared default; a translatable label resolves at draw time. */
+        public Builder floatSlider(Component label, Supplier<Float> getter, Consumer<Float> setter, float min, float max, float step,
+                                   Float defaultValue) {
+            this.addEntry(new ConfigEntry.FloatSlider(label, getter, setter, min, max, step, defaultValue));
+            return this;
+        }
+
         public Builder doubleSlider(String label, Supplier<Double> getter, Consumer<Double> setter, double min, double max, double step) {
+            this.addEntry(new ConfigEntry.DoubleSlider(label, getter, setter, min, max, step));
+            return this;
+        }
+
+        /** Component variant of {@link #doubleSlider(String, Supplier, Consumer, double, double, double)}; a translatable label resolves at draw time. */
+        public Builder doubleSlider(Component label, Supplier<Double> getter, Consumer<Double> setter, double min, double max, double step) {
             this.addEntry(new ConfigEntry.DoubleSlider(label, getter, setter, min, max, step));
             return this;
         }
@@ -470,13 +548,33 @@ public class ModernConfigScreen extends Screen {
             return this;
         }
 
+        /** Component variant with a declared default; a translatable label resolves at draw time. */
+        public Builder doubleSlider(Component label, Supplier<Double> getter, Consumer<Double> setter, double min, double max, double step,
+                                    Double defaultValue) {
+            this.addEntry(new ConfigEntry.DoubleSlider(label, getter, setter, min, max, step, defaultValue));
+            return this;
+        }
+
         public Builder text(String label, Supplier<String> getter, Consumer<String> setter, int maxLength) {
+            this.addEntry(new ConfigEntry.Text(label, getter, setter, maxLength));
+            return this;
+        }
+
+        /** Component variant of {@link #text(String, Supplier, Consumer, int)}; a translatable label resolves at draw time. */
+        public Builder text(Component label, Supplier<String> getter, Consumer<String> setter, int maxLength) {
             this.addEntry(new ConfigEntry.Text(label, getter, setter, maxLength));
             return this;
         }
 
         /** Text field whose non-conforming input is marked invalid while typing. */
         public Builder text(String label, Supplier<String> getter, Consumer<String> setter, int maxLength,
+                            Predicate<String> validator) {
+            this.addEntry(new ConfigEntry.Text(label, getter, setter, maxLength, validator));
+            return this;
+        }
+
+        /** Component variant with a validator; a translatable label resolves at draw time. */
+        public Builder text(Component label, Supplier<String> getter, Consumer<String> setter, int maxLength,
                             Predicate<String> validator) {
             this.addEntry(new ConfigEntry.Text(label, getter, setter, maxLength, validator));
             return this;
@@ -489,8 +587,22 @@ public class ModernConfigScreen extends Screen {
             return this;
         }
 
+        /** Component variant with a declared default; a translatable label resolves at draw time. */
+        public Builder text(Component label, Supplier<String> getter, Consumer<String> setter, int maxLength,
+                            String defaultValue) {
+            this.addEntry(new ConfigEntry.Text(label, getter, setter, maxLength, defaultValue));
+            return this;
+        }
+
         /** Text field with both a validator and a declared default. */
         public Builder text(String label, Supplier<String> getter, Consumer<String> setter, int maxLength,
+                            Predicate<String> validator, String defaultValue) {
+            this.addEntry(new ConfigEntry.Text(label, getter, setter, maxLength, validator, defaultValue));
+            return this;
+        }
+
+        /** Component variant with both; a translatable label resolves at draw time. */
+        public Builder text(Component label, Supplier<String> getter, Consumer<String> setter, int maxLength,
                             Predicate<String> validator, String defaultValue) {
             this.addEntry(new ConfigEntry.Text(label, getter, setter, maxLength, validator, defaultValue));
             return this;
@@ -505,8 +617,20 @@ public class ModernConfigScreen extends Screen {
             return this;
         }
 
+        /** Component variant of {@link #color(String, IntSupplier, IntConsumer)}; a translatable label resolves at draw time. */
+        public Builder color(Component label, IntSupplier getter, IntConsumer setter) {
+            this.addEntry(new ConfigEntry.Color(label, getter, setter));
+            return this;
+        }
+
         /** Colour option with a declared default; the card gets a reset-to-default button. */
         public Builder color(String label, IntSupplier getter, IntConsumer setter, Integer defaultValue) {
+            this.addEntry(new ConfigEntry.Color(label, getter, setter, defaultValue));
+            return this;
+        }
+
+        /** Component variant with a declared default; a translatable label resolves at draw time. */
+        public Builder color(Component label, IntSupplier getter, IntConsumer setter, Integer defaultValue) {
             this.addEntry(new ConfigEntry.Color(label, getter, setter, defaultValue));
             return this;
         }
@@ -522,9 +646,26 @@ public class ModernConfigScreen extends Screen {
             return this;
         }
 
+        /**
+         * Component variant of {@link #cycle(String, Supplier, Consumer, Object[], Function)}:
+         * the namer returns components, so translatable value names resolve at draw time.
+         */
+        public <T> Builder cycle(Component label, Supplier<T> getter, Consumer<T> setter, T[] values,
+                                 Function<T, Component> namer) {
+            this.addEntry(new ConfigEntry.Cycle<>(label, getter, setter, values, namer));
+            return this;
+        }
+
         /** Cycle card with a declared default; the card gets a reset-to-default button. */
         public <T> Builder cycle(String label, Supplier<T> getter, Consumer<T> setter, T[] values,
                                  Function<T, String> namer, T defaultValue) {
+            this.addEntry(new ConfigEntry.Cycle<>(label, getter, setter, values, namer, defaultValue));
+            return this;
+        }
+
+        /** Component variant with a declared default; translatable text resolves at draw time. */
+        public <T> Builder cycle(Component label, Supplier<T> getter, Consumer<T> setter, T[] values,
+                                 Function<T, Component> namer, T defaultValue) {
             this.addEntry(new ConfigEntry.Cycle<>(label, getter, setter, values, namer, defaultValue));
             return this;
         }
@@ -539,6 +680,16 @@ public class ModernConfigScreen extends Screen {
             return this;
         }
 
+        /**
+         * Component variant of {@link #select(String, Supplier, Consumer, Object[], Function)}:
+         * the namer returns components, so translatable value names resolve at draw time.
+         */
+        public <T> Builder select(Component label, Supplier<T> getter, Consumer<T> setter, T[] values,
+                                  Function<T, Component> namer) {
+            this.addEntry(new ConfigEntry.Select<>(label, getter, setter, values, namer));
+            return this;
+        }
+
         /** Dropdown with a declared default; the card gets a reset-to-default button. */
         public <T> Builder select(String label, Supplier<T> getter, Consumer<T> setter, T[] values,
                                   Function<T, String> namer, T defaultValue) {
@@ -546,7 +697,20 @@ public class ModernConfigScreen extends Screen {
             return this;
         }
 
+        /** Component variant with a declared default; translatable text resolves at draw time. */
+        public <T> Builder select(Component label, Supplier<T> getter, Consumer<T> setter, T[] values,
+                                  Function<T, Component> namer, T defaultValue) {
+            this.addEntry(new ConfigEntry.Select<>(label, getter, setter, values, namer, defaultValue));
+            return this;
+        }
+
         public Builder button(String label, Runnable onPress) {
+            this.addEntry(new ConfigEntry.Button(label, onPress));
+            return this;
+        }
+
+        /** Component variant of {@link #button(String, Runnable)}; a translatable label resolves at draw time. */
+        public Builder button(Component label, Runnable onPress) {
             this.addEntry(new ConfigEntry.Button(label, onPress));
             return this;
         }
@@ -561,8 +725,20 @@ public class ModernConfigScreen extends Screen {
             return this;
         }
 
+        /** Component variant of {@link #keybind(String, IntSupplier, IntConsumer)}; a translatable label resolves at draw time. */
+        public Builder keybind(Component label, IntSupplier getter, IntConsumer setter) {
+            this.addEntry(new ConfigEntry.Keybind(label, getter, setter));
+            return this;
+        }
+
         /** Key bind with a declared default; the card gets a reset-to-default button. */
         public Builder keybind(String label, IntSupplier getter, IntConsumer setter, Integer defaultValue) {
+            this.addEntry(new ConfigEntry.Keybind(label, getter, setter, defaultValue));
+            return this;
+        }
+
+        /** Component variant with a declared default; a translatable label resolves at draw time. */
+        public Builder keybind(Component label, IntSupplier getter, IntConsumer setter, Integer defaultValue) {
             this.addEntry(new ConfigEntry.Keybind(label, getter, setter, defaultValue));
             return this;
         }
@@ -576,8 +752,21 @@ public class ModernConfigScreen extends Screen {
             return this;
         }
 
+        /** Component variant of {@link #stringList(String, Supplier, Consumer)}; a translatable label resolves at draw time. */
+        public Builder stringList(Component label, Supplier<List<String>> getter, Consumer<List<String>> setter) {
+            this.addEntry(new ConfigEntry.StringList(label, getter, setter));
+            return this;
+        }
+
         /** String list with a declared default; the card gets a reset-to-default button. */
         public Builder stringList(String label, Supplier<List<String>> getter, Consumer<List<String>> setter,
+                                  List<String> defaultValue) {
+            this.addEntry(new ConfigEntry.StringList(label, getter, setter, defaultValue));
+            return this;
+        }
+
+        /** Component variant with a declared default; a translatable label resolves at draw time. */
+        public Builder stringList(Component label, Supplier<List<String>> getter, Consumer<List<String>> setter,
                                   List<String> defaultValue) {
             this.addEntry(new ConfigEntry.StringList(label, getter, setter, defaultValue));
             return this;
@@ -592,8 +781,21 @@ public class ModernConfigScreen extends Screen {
             return this;
         }
 
+        /** Component variant of {@link #intList(String, Supplier, Consumer)}; a translatable label resolves at draw time. */
+        public Builder intList(Component label, Supplier<List<Integer>> getter, Consumer<List<Integer>> setter) {
+            this.addEntry(new ConfigEntry.IntList(label, getter, setter));
+            return this;
+        }
+
         /** Int list with a declared default; the card gets a reset-to-default button. */
         public Builder intList(String label, Supplier<List<Integer>> getter, Consumer<List<Integer>> setter,
+                               List<Integer> defaultValue) {
+            this.addEntry(new ConfigEntry.IntList(label, getter, setter, defaultValue));
+            return this;
+        }
+
+        /** Component variant with a declared default; a translatable label resolves at draw time. */
+        public Builder intList(Component label, Supplier<List<Integer>> getter, Consumer<List<Integer>> setter,
                                List<Integer> defaultValue) {
             this.addEntry(new ConfigEntry.IntList(label, getter, setter, defaultValue));
             return this;
@@ -605,8 +807,21 @@ public class ModernConfigScreen extends Screen {
             return this;
         }
 
+        /** Component variant of {@link #floatList(String, Supplier, Consumer)}; a translatable label resolves at draw time. */
+        public Builder floatList(Component label, Supplier<List<Float>> getter, Consumer<List<Float>> setter) {
+            this.addEntry(new ConfigEntry.FloatList(label, getter, setter));
+            return this;
+        }
+
         /** Float list with a declared default; the card gets a reset-to-default button. */
         public Builder floatList(String label, Supplier<List<Float>> getter, Consumer<List<Float>> setter,
+                                 List<Float> defaultValue) {
+            this.addEntry(new ConfigEntry.FloatList(label, getter, setter, defaultValue));
+            return this;
+        }
+
+        /** Component variant with a declared default; a translatable label resolves at draw time. */
+        public Builder floatList(Component label, Supplier<List<Float>> getter, Consumer<List<Float>> setter,
                                  List<Float> defaultValue) {
             this.addEntry(new ConfigEntry.FloatList(label, getter, setter, defaultValue));
             return this;
@@ -618,8 +833,21 @@ public class ModernConfigScreen extends Screen {
             return this;
         }
 
+        /** Component variant of {@link #doubleList(String, Supplier, Consumer)}; a translatable label resolves at draw time. */
+        public Builder doubleList(Component label, Supplier<List<Double>> getter, Consumer<List<Double>> setter) {
+            this.addEntry(new ConfigEntry.DoubleList(label, getter, setter));
+            return this;
+        }
+
         /** Double list with a declared default; the card gets a reset-to-default button. */
         public Builder doubleList(String label, Supplier<List<Double>> getter, Consumer<List<Double>> setter,
+                                  List<Double> defaultValue) {
+            this.addEntry(new ConfigEntry.DoubleList(label, getter, setter, defaultValue));
+            return this;
+        }
+
+        /** Component variant with a declared default; a translatable label resolves at draw time. */
+        public Builder doubleList(Component label, Supplier<List<Double>> getter, Consumer<List<Double>> setter,
                                   List<Double> defaultValue) {
             this.addEntry(new ConfigEntry.DoubleList(label, getter, setter, defaultValue));
             return this;
@@ -630,6 +858,12 @@ public class ModernConfigScreen extends Screen {
          * card column and the Cancel/Save footer. Meant for escape hatches, not config options.
          */
         public Builder cornerButton(String label, Runnable onPress) {
+            this.cornerButton = new CornerButton(label, onPress);
+            return this;
+        }
+
+        /** Component variant of {@link #cornerButton(String, Runnable)}; a translatable label resolves at draw time. */
+        public Builder cornerButton(Component label, Runnable onPress) {
             this.cornerButton = new CornerButton(label, onPress);
             return this;
         }

@@ -128,7 +128,9 @@ public class ConfigEntryList extends CardList {
         /** Applies the Builder's per-option decorations (restart badge, condition, error). */
         public void optionState(@Nullable OptionState state) {
             this.state = state;
-            this.restartBadge = state != null && state.restart() ? Badge.warning(0, 0, "Restart") : null;
+            this.restartBadge = state != null && state.restart()
+                    ? Badge.warning(0, 0, Component.translatable("modernconfig.restart"))
+                    : null;
         }
 
         /** False while the option's condition says otherwise: the row renders dimmed and inert. */
@@ -276,7 +278,7 @@ public class ConfigEntryList extends CardList {
         private final Component title;
 
         public HeaderRow(Component title) {
-            this.title = Ui.uiBold(title.getString().toUpperCase(Locale.ROOT));
+            this.title = title;
         }
 
         @Override
@@ -289,8 +291,11 @@ public class ConfigEntryList extends CardList {
             if (!this.isVisible()) {
                 return;
             }
+            // Upper-cased and font-wrapped per frame so a translatable title tracks language
+            // changes; headers are rare rows, so the small per-frame cost is fine.
+            Component drawn = Ui.uiBold(Component.literal(this.title.getString().toUpperCase(Locale.ROOT)));
             int y = this.cardY() + CARD_HEIGHT - Ui.font().lineHeight - 4;
-            Ui.text(gfx, this.title, this.getX() + 2, y, this.theme().textMuted);
+            Ui.text(gfx, drawn, this.getX() + 2, y, this.theme().textMuted);
         }
     }
 

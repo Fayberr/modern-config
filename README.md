@@ -22,9 +22,9 @@ repositories {
 
 dependencies {
     // compileOnly: your mod compiles against the API without shipping it
-    compileOnly "net.fayber:modern-config:1.8.0"
+    compileOnly "net.fayber:modern-config:1.9.0"
     // runtimeOnly pulls it into the dev client, so the integration is exercised on every boot
-    runtimeOnly "net.fayber:modern-config:1.8.0"
+    runtimeOnly "net.fayber:modern-config:1.9.0"
 }
 ```
 
@@ -74,6 +74,13 @@ which is how dependent options read ("Beam Width" only while the beam is enabled
 condition is re-checked every frame and may read other options' getters. `error(supplier)`
 turns the card border red and shows the message in the option's tooltip while the supplier
 returns one, and falls back to the entry's own tooltip when it does not.
+
+Every text also has a `Component` overload: labels, tooltips, tab and category names, notes
+and the corner button label, plus `cycle`/`select` namers that return components. Pass
+`Component.translatable("mykey")` and the text is stored as given, so it re-resolves against
+the player's language whenever it is drawn (the String overloads wrap in a literal and stay
+the short way to write a screen). The screen's own strings (Cancel, Save, the Restart badge,
+reset-to-default) come from the `modernconfig` lang file, so they localize too.
 
 The behavior contract, which is the point:
 

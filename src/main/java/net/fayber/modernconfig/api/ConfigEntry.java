@@ -58,9 +58,13 @@ public interface ConfigEntry {
 
     /**
      * Sets the tooltip text and returns the entry for chaining. The Builder's
-     * {@code .tooltip(...)} calls this on the most recently added entry.
+     * {@code .tooltip(...)} calls this on the most recently added entry. Stored as given, so a
+     * translatable resolves against the current language whenever the tooltip renders.
      */
     ConfigEntry tooltip(String tooltip);
+
+    /** Component variant of {@link #tooltip(String)}; a translatable resolves at draw time. */
+    ConfigEntry tooltip(Component tooltip);
 
     /** Records the current value (called once when the screen opens). */
     void snapshot();
@@ -85,7 +89,7 @@ public interface ConfigEntry {
         IconButton button = new IconButton(0, 0, RESET_SIZE, Icons.ROTATE_CCW,
                 () -> applyDefault.accept(defaultValue))
                 .theme(THEME)
-                .tooltip("Reset to default");
+                .tooltip(Component.translatable("modernconfig.reset_default"));
         return new ConfigEntryList.Reset(button, () -> !Objects.equals(currentValue.get(), defaultValue));
     }
 
@@ -172,15 +176,20 @@ public interface ConfigEntry {
 
     /** Category header; not an option. */
     final class Header implements ConfigEntry {
-        private final String name;
+        private final Component name;
 
         public Header(String name) {
+            this(Component.literal(name));
+        }
+
+        /** Component variant: a translatable name resolves at draw time. */
+        public Header(Component name) {
             this.name = name;
         }
 
         @Override
         public Component label() {
-            return Component.literal(this.name);
+            return this.name;
         }
 
         @Override
@@ -190,6 +199,11 @@ public interface ConfigEntry {
 
         @Override
         public Header tooltip(String tooltip) {
+            return this; // headers have no tooltip
+        }
+
+        @Override
+        public Header tooltip(Component tooltip) {
             return this; // headers have no tooltip
         }
 
@@ -209,15 +223,20 @@ public interface ConfigEntry {
 
     /** Static paragraph of documentation text; not an option and not interactive. */
     final class Note implements ConfigEntry {
-        private final String text;
+        private final Component text;
 
         public Note(String text) {
+            this(Component.literal(text));
+        }
+
+        /** Component variant: a translatable text resolves when the note is wrapped and drawn. */
+        public Note(Component text) {
             this.text = text;
         }
 
         @Override
         public Component label() {
-            return Component.literal(this.text);
+            return this.text;
         }
 
         @Override
@@ -227,6 +246,11 @@ public interface ConfigEntry {
 
         @Override
         public Note tooltip(String tooltip) {
+            return this; // notes have no tooltip
+        }
+
+        @Override
+        public Note tooltip(Component tooltip) {
             return this; // notes have no tooltip
         }
 
@@ -255,19 +279,35 @@ public interface ConfigEntry {
         private Boolean oldValue;
 
         public Bool(String label, Supplier<Boolean> getter, Consumer<Boolean> setter) {
+            this(Component.literal(label), getter, setter);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public Bool(Component label, Supplier<Boolean> getter, Consumer<Boolean> setter) {
             this(label, getter, setter, null);
         }
 
         public Bool(String label, Supplier<Boolean> getter, Consumer<Boolean> setter,
                     @Nullable Boolean defaultValue) {
-            this.label = Component.literal(label);
+            this(Component.literal(label), getter, setter, defaultValue);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public Bool(Component label, Supplier<Boolean> getter, Consumer<Boolean> setter,
+                    @Nullable Boolean defaultValue) {
+            this.label = label;
             this.getter = getter;
             this.setter = setter;
             this.defaultValue = defaultValue;
         }
 
         public Bool tooltip(String tooltip) {
-            this.tooltip = Component.literal(tooltip);
+            return this.tooltip(Component.literal(tooltip));
+        }
+
+        /** Component variant: a translatable tooltip resolves when it renders. */
+        public Bool tooltip(Component tooltip) {
+            this.tooltip = tooltip;
             return this;
         }
 
@@ -313,12 +353,23 @@ public interface ConfigEntry {
         private Integer oldValue;
 
         public IntSlider(String label, IntSupplier getter, IntConsumer setter, int min, int max, int step) {
+            this(Component.literal(label), getter, setter, min, max, step);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public IntSlider(Component label, IntSupplier getter, IntConsumer setter, int min, int max, int step) {
             this(label, getter, setter, min, max, step, null);
         }
 
         public IntSlider(String label, IntSupplier getter, IntConsumer setter, int min, int max, int step,
                          @Nullable Integer defaultValue) {
-            this.label = Component.literal(label);
+            this(Component.literal(label), getter, setter, min, max, step, defaultValue);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public IntSlider(Component label, IntSupplier getter, IntConsumer setter, int min, int max, int step,
+                         @Nullable Integer defaultValue) {
+            this.label = label;
             this.getter = getter;
             this.setter = setter;
             this.min = min;
@@ -328,7 +379,12 @@ public interface ConfigEntry {
         }
 
         public IntSlider tooltip(String tooltip) {
-            this.tooltip = Component.literal(tooltip);
+            return this.tooltip(Component.literal(tooltip));
+        }
+
+        /** Component variant: a translatable tooltip resolves when it renders. */
+        public IntSlider tooltip(Component tooltip) {
+            this.tooltip = tooltip;
             return this;
         }
 
@@ -374,12 +430,23 @@ public interface ConfigEntry {
         private Float oldValue;
 
         public FloatSlider(String label, Supplier<Float> getter, Consumer<Float> setter, float min, float max, float step) {
+            this(Component.literal(label), getter, setter, min, max, step);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public FloatSlider(Component label, Supplier<Float> getter, Consumer<Float> setter, float min, float max, float step) {
             this(label, getter, setter, min, max, step, null);
         }
 
         public FloatSlider(String label, Supplier<Float> getter, Consumer<Float> setter, float min, float max, float step,
                            @Nullable Float defaultValue) {
-            this.label = Component.literal(label);
+            this(Component.literal(label), getter, setter, min, max, step, defaultValue);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public FloatSlider(Component label, Supplier<Float> getter, Consumer<Float> setter, float min, float max, float step,
+                           @Nullable Float defaultValue) {
+            this.label = label;
             this.getter = getter;
             this.setter = setter;
             this.min = min;
@@ -389,7 +456,12 @@ public interface ConfigEntry {
         }
 
         public FloatSlider tooltip(String tooltip) {
-            this.tooltip = Component.literal(tooltip);
+            return this.tooltip(Component.literal(tooltip));
+        }
+
+        /** Component variant: a translatable tooltip resolves when it renders. */
+        public FloatSlider tooltip(Component tooltip) {
+            this.tooltip = tooltip;
             return this;
         }
 
@@ -435,12 +507,23 @@ public interface ConfigEntry {
         private Double oldValue;
 
         public DoubleSlider(String label, Supplier<Double> getter, Consumer<Double> setter, double min, double max, double step) {
+            this(Component.literal(label), getter, setter, min, max, step);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public DoubleSlider(Component label, Supplier<Double> getter, Consumer<Double> setter, double min, double max, double step) {
             this(label, getter, setter, min, max, step, null);
         }
 
         public DoubleSlider(String label, Supplier<Double> getter, Consumer<Double> setter, double min, double max, double step,
                             @Nullable Double defaultValue) {
-            this.label = Component.literal(label);
+            this(Component.literal(label), getter, setter, min, max, step, defaultValue);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public DoubleSlider(Component label, Supplier<Double> getter, Consumer<Double> setter, double min, double max, double step,
+                            @Nullable Double defaultValue) {
+            this.label = label;
             this.getter = getter;
             this.setter = setter;
             this.min = min;
@@ -450,7 +533,12 @@ public interface ConfigEntry {
         }
 
         public DoubleSlider tooltip(String tooltip) {
-            this.tooltip = Component.literal(tooltip);
+            return this.tooltip(Component.literal(tooltip));
+        }
+
+        /** Component variant: a translatable tooltip resolves when it renders. */
+        public DoubleSlider tooltip(Component tooltip) {
+            this.tooltip = tooltip;
             return this;
         }
 
@@ -497,22 +585,45 @@ public interface ConfigEntry {
         private String oldValue;
 
         public Text(String label, Supplier<String> getter, Consumer<String> setter, int maxLength) {
+            this(Component.literal(label), getter, setter, maxLength);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public Text(Component label, Supplier<String> getter, Consumer<String> setter, int maxLength) {
             this(label, getter, setter, maxLength, null, null);
         }
 
         public Text(String label, Supplier<String> getter, Consumer<String> setter, int maxLength,
+                    @Nullable Predicate<String> validator) {
+            this(Component.literal(label), getter, setter, maxLength, validator);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public Text(Component label, Supplier<String> getter, Consumer<String> setter, int maxLength,
                     @Nullable Predicate<String> validator) {
             this(label, getter, setter, maxLength, validator, null);
         }
 
         public Text(String label, Supplier<String> getter, Consumer<String> setter, int maxLength,
                     @Nullable String defaultValue) {
+            this(Component.literal(label), getter, setter, maxLength, defaultValue);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public Text(Component label, Supplier<String> getter, Consumer<String> setter, int maxLength,
+                    @Nullable String defaultValue) {
             this(label, getter, setter, maxLength, null, defaultValue);
         }
 
         public Text(String label, Supplier<String> getter, Consumer<String> setter, int maxLength,
                     @Nullable Predicate<String> validator, @Nullable String defaultValue) {
-            this.label = Component.literal(label);
+            this(Component.literal(label), getter, setter, maxLength, validator, defaultValue);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public Text(Component label, Supplier<String> getter, Consumer<String> setter, int maxLength,
+                    @Nullable Predicate<String> validator, @Nullable String defaultValue) {
+            this.label = label;
             this.getter = getter;
             this.setter = setter;
             this.maxLength = maxLength;
@@ -521,7 +632,12 @@ public interface ConfigEntry {
         }
 
         public Text tooltip(String tooltip) {
-            this.tooltip = Component.literal(tooltip);
+            return this.tooltip(Component.literal(tooltip));
+        }
+
+        /** Component variant: a translatable tooltip resolves when it renders. */
+        public Text tooltip(Component tooltip) {
+            this.tooltip = tooltip;
             return this;
         }
 
@@ -580,18 +696,33 @@ public interface ConfigEntry {
         private Integer oldValue;
 
         public Color(String label, IntSupplier getter, IntConsumer setter) {
+            this(Component.literal(label), getter, setter);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public Color(Component label, IntSupplier getter, IntConsumer setter) {
             this(label, getter, setter, null);
         }
 
         public Color(String label, IntSupplier getter, IntConsumer setter, @Nullable Integer defaultValue) {
-            this.label = Component.literal(label);
+            this(Component.literal(label), getter, setter, defaultValue);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public Color(Component label, IntSupplier getter, IntConsumer setter, @Nullable Integer defaultValue) {
+            this.label = label;
             this.getter = getter;
             this.setter = setter;
             this.defaultValue = defaultValue;
         }
 
         public Color tooltip(String tooltip) {
-            this.tooltip = Component.literal(tooltip);
+            return this.tooltip(Component.literal(tooltip));
+        }
+
+        /** Component variant: a translatable tooltip resolves when it renders. */
+        public Color tooltip(Component tooltip) {
+            this.tooltip = tooltip;
             return this;
         }
 
@@ -634,7 +765,7 @@ public interface ConfigEntry {
         private final Supplier<T> getter;
         private final Consumer<T> setter;
         private final T[] values;
-        private final Function<T, String> namer;
+        private final Function<T, Component> namer;
         @Nullable
         private final T defaultValue;
         private Component tooltip;
@@ -642,12 +773,28 @@ public interface ConfigEntry {
 
         public Cycle(String label, Supplier<T> getter, Consumer<T> setter, T[] values,
                      Function<T, String> namer) {
+            this(Component.literal(label), getter, setter, values, namer.andThen(Component::literal));
+        }
+
+        /**
+         * Component variant: a translatable label and a namer returning translatables resolve at
+         * draw time.
+         */
+        public Cycle(Component label, Supplier<T> getter, Consumer<T> setter, T[] values,
+                     Function<T, Component> namer) {
             this(label, getter, setter, values, namer, null);
         }
 
         public Cycle(String label, Supplier<T> getter, Consumer<T> setter, T[] values,
                      Function<T, String> namer, @Nullable T defaultValue) {
-            this.label = Component.literal(label);
+            this(Component.literal(label), getter, setter, values, namer.andThen(Component::literal),
+                    defaultValue);
+        }
+
+        /** Component variant: a translatable label and namer resolve at draw time. */
+        public Cycle(Component label, Supplier<T> getter, Consumer<T> setter, T[] values,
+                     Function<T, Component> namer, @Nullable T defaultValue) {
+            this.label = label;
             this.getter = getter;
             this.setter = setter;
             this.values = values;
@@ -656,7 +803,12 @@ public interface ConfigEntry {
         }
 
         public Cycle<T> tooltip(String tooltip) {
-            this.tooltip = Component.literal(tooltip);
+            return this.tooltip(Component.literal(tooltip));
+        }
+
+        /** Component variant: a translatable tooltip resolves when it renders. */
+        public Cycle<T> tooltip(Component tooltip) {
+            this.tooltip = tooltip;
             return this;
         }
 
@@ -697,7 +849,7 @@ public interface ConfigEntry {
         private final Supplier<T> getter;
         private final Consumer<T> setter;
         private final T[] values;
-        private final Function<T, String> namer;
+        private final Function<T, Component> namer;
         @Nullable
         private final T defaultValue;
         private Component tooltip;
@@ -705,12 +857,28 @@ public interface ConfigEntry {
 
         public Select(String label, Supplier<T> getter, Consumer<T> setter, T[] values,
                       Function<T, String> namer) {
+            this(Component.literal(label), getter, setter, values, namer.andThen(Component::literal));
+        }
+
+        /**
+         * Component variant: a translatable label and a namer returning translatables resolve at
+         * draw time (the dropdown re-reads its option components every frame).
+         */
+        public Select(Component label, Supplier<T> getter, Consumer<T> setter, T[] values,
+                      Function<T, Component> namer) {
             this(label, getter, setter, values, namer, null);
         }
 
         public Select(String label, Supplier<T> getter, Consumer<T> setter, T[] values,
                       Function<T, String> namer, @Nullable T defaultValue) {
-            this.label = Component.literal(label);
+            this(Component.literal(label), getter, setter, values, namer.andThen(Component::literal),
+                    defaultValue);
+        }
+
+        /** Component variant: a translatable label and namer resolve at draw time. */
+        public Select(Component label, Supplier<T> getter, Consumer<T> setter, T[] values,
+                      Function<T, Component> namer, @Nullable T defaultValue) {
+            this.label = label;
             this.getter = getter;
             this.setter = setter;
             this.values = values;
@@ -719,7 +887,12 @@ public interface ConfigEntry {
         }
 
         public Select<T> tooltip(String tooltip) {
-            this.tooltip = Component.literal(tooltip);
+            return this.tooltip(Component.literal(tooltip));
+        }
+
+        /** Component variant: a translatable tooltip resolves when it renders. */
+        public Select<T> tooltip(Component tooltip) {
+            this.tooltip = tooltip;
             return this;
         }
 
@@ -745,7 +918,8 @@ public interface ConfigEntry {
 
         @Override
         public ConfigEntryList.Row createRow() {
-            List<String> options = new ArrayList<>(this.values.length);
+            // Raw components: the Dropdown applies the Inter font itself when it stores them.
+            List<Component> options = new ArrayList<>(this.values.length);
             for (T value : this.values) {
                 options.add(this.namer.apply(value));
             }
@@ -783,18 +957,33 @@ public interface ConfigEntry {
         private Integer oldValue;
 
         public Keybind(String label, IntSupplier getter, IntConsumer setter) {
+            this(Component.literal(label), getter, setter);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public Keybind(Component label, IntSupplier getter, IntConsumer setter) {
             this(label, getter, setter, null);
         }
 
         public Keybind(String label, IntSupplier getter, IntConsumer setter, @Nullable Integer defaultValue) {
-            this.label = Component.literal(label);
+            this(Component.literal(label), getter, setter, defaultValue);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public Keybind(Component label, IntSupplier getter, IntConsumer setter, @Nullable Integer defaultValue) {
+            this.label = label;
             this.getter = getter;
             this.setter = setter;
             this.defaultValue = defaultValue;
         }
 
         public Keybind tooltip(String tooltip) {
-            this.tooltip = Component.literal(tooltip);
+            return this.tooltip(Component.literal(tooltip));
+        }
+
+        /** Component variant: a translatable tooltip resolves when it renders. */
+        public Keybind tooltip(Component tooltip) {
+            this.tooltip = tooltip;
             return this;
         }
 
@@ -842,19 +1031,35 @@ public interface ConfigEntry {
         private List<String> oldValue;
 
         public StringList(String label, Supplier<List<String>> getter, Consumer<List<String>> setter) {
+            this(Component.literal(label), getter, setter);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public StringList(Component label, Supplier<List<String>> getter, Consumer<List<String>> setter) {
             this(label, getter, setter, null);
         }
 
         public StringList(String label, Supplier<List<String>> getter, Consumer<List<String>> setter,
                           @Nullable List<String> defaultValue) {
-            this.label = Component.literal(label);
+            this(Component.literal(label), getter, setter, defaultValue);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public StringList(Component label, Supplier<List<String>> getter, Consumer<List<String>> setter,
+                          @Nullable List<String> defaultValue) {
+            this.label = label;
             this.getter = getter;
             this.setter = setter;
             this.defaultValue = defaultValue == null ? null : List.copyOf(defaultValue);
         }
 
         public StringList tooltip(String tooltip) {
-            this.tooltip = Component.literal(tooltip);
+            return this.tooltip(Component.literal(tooltip));
+        }
+
+        /** Component variant: a translatable tooltip resolves when it renders. */
+        public StringList tooltip(Component tooltip) {
+            this.tooltip = tooltip;
             return this;
         }
 
@@ -915,19 +1120,35 @@ public interface ConfigEntry {
         private List<Integer> oldValue;
 
         public IntList(String label, Supplier<List<Integer>> getter, Consumer<List<Integer>> setter) {
+            this(Component.literal(label), getter, setter);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public IntList(Component label, Supplier<List<Integer>> getter, Consumer<List<Integer>> setter) {
             this(label, getter, setter, null);
         }
 
         public IntList(String label, Supplier<List<Integer>> getter, Consumer<List<Integer>> setter,
                        @Nullable List<Integer> defaultValue) {
-            this.label = Component.literal(label);
+            this(Component.literal(label), getter, setter, defaultValue);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public IntList(Component label, Supplier<List<Integer>> getter, Consumer<List<Integer>> setter,
+                       @Nullable List<Integer> defaultValue) {
+            this.label = label;
             this.getter = getter;
             this.setter = setter;
             this.defaultValue = defaultValue == null ? null : List.copyOf(defaultValue);
         }
 
         public IntList tooltip(String tooltip) {
-            this.tooltip = Component.literal(tooltip);
+            return this.tooltip(Component.literal(tooltip));
+        }
+
+        /** Component variant: a translatable tooltip resolves when it renders. */
+        public IntList tooltip(Component tooltip) {
+            this.tooltip = tooltip;
             return this;
         }
 
@@ -984,19 +1205,35 @@ public interface ConfigEntry {
         private List<Float> oldValue;
 
         public FloatList(String label, Supplier<List<Float>> getter, Consumer<List<Float>> setter) {
+            this(Component.literal(label), getter, setter);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public FloatList(Component label, Supplier<List<Float>> getter, Consumer<List<Float>> setter) {
             this(label, getter, setter, null);
         }
 
         public FloatList(String label, Supplier<List<Float>> getter, Consumer<List<Float>> setter,
                          @Nullable List<Float> defaultValue) {
-            this.label = Component.literal(label);
+            this(Component.literal(label), getter, setter, defaultValue);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public FloatList(Component label, Supplier<List<Float>> getter, Consumer<List<Float>> setter,
+                         @Nullable List<Float> defaultValue) {
+            this.label = label;
             this.getter = getter;
             this.setter = setter;
             this.defaultValue = defaultValue == null ? null : List.copyOf(defaultValue);
         }
 
         public FloatList tooltip(String tooltip) {
-            this.tooltip = Component.literal(tooltip);
+            return this.tooltip(Component.literal(tooltip));
+        }
+
+        /** Component variant: a translatable tooltip resolves when it renders. */
+        public FloatList tooltip(Component tooltip) {
+            this.tooltip = tooltip;
             return this;
         }
 
@@ -1053,19 +1290,35 @@ public interface ConfigEntry {
         private List<Double> oldValue;
 
         public DoubleList(String label, Supplier<List<Double>> getter, Consumer<List<Double>> setter) {
+            this(Component.literal(label), getter, setter);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public DoubleList(Component label, Supplier<List<Double>> getter, Consumer<List<Double>> setter) {
             this(label, getter, setter, null);
         }
 
         public DoubleList(String label, Supplier<List<Double>> getter, Consumer<List<Double>> setter,
                           @Nullable List<Double> defaultValue) {
-            this.label = Component.literal(label);
+            this(Component.literal(label), getter, setter, defaultValue);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public DoubleList(Component label, Supplier<List<Double>> getter, Consumer<List<Double>> setter,
+                          @Nullable List<Double> defaultValue) {
+            this.label = label;
             this.getter = getter;
             this.setter = setter;
             this.defaultValue = defaultValue == null ? null : List.copyOf(defaultValue);
         }
 
         public DoubleList tooltip(String tooltip) {
-            this.tooltip = Component.literal(tooltip);
+            return this.tooltip(Component.literal(tooltip));
+        }
+
+        /** Component variant: a translatable tooltip resolves when it renders. */
+        public DoubleList tooltip(Component tooltip) {
+            this.tooltip = tooltip;
             return this;
         }
 
@@ -1118,12 +1371,22 @@ public interface ConfigEntry {
         private Component tooltip;
 
         public Button(String label, Runnable onPress) {
-            this.label = Component.literal(label);
+            this(Component.literal(label), onPress);
+        }
+
+        /** Component variant: a translatable label resolves at draw time. */
+        public Button(Component label, Runnable onPress) {
+            this.label = label;
             this.onPress = onPress;
         }
 
         public Button tooltip(String tooltip) {
-            this.tooltip = Component.literal(tooltip);
+            return this.tooltip(Component.literal(tooltip));
+        }
+
+        /** Component variant: a translatable tooltip resolves when it renders. */
+        public Button tooltip(Component tooltip) {
+            this.tooltip = tooltip;
             return this;
         }
 
