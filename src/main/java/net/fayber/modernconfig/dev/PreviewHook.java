@@ -65,12 +65,30 @@ public final class PreviewHook {
         }
         final double cx = clickX;
         final double cy = clickY;
+        // -Dmodernconfig.previewClick2=<x>,<y> fires 30 ticks after the first click, so a run can
+        // open the picker and then click inside the SV square at an arbitrary (drag-like) position.
+        double click2X = -1;
+        double click2Y = -1;
+        String click2Prop = System.getProperty("modernconfig.previewClick2");
+        if (click2Prop != null) {
+            String[] parts = click2Prop.split(",");
+            if (parts.length == 2) {
+                try {
+                    click2X = Double.parseDouble(parts[0].trim());
+                    click2Y = Double.parseDouble(parts[1].trim());
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+        final double c2x = click2X;
+        final double c2y = click2Y;
         ClientTickEvents.END_CLIENT_TICK.register(new ClientTickEvents.EndTick() {
             private int ticks = 0;
             private boolean opened = false;
             private boolean tabbed = false;
             private boolean scrolled = false;
             private boolean clicked = false;
+            private boolean clicked2 = false;
 
             @Override
             public void onEndTick(net.minecraft.client.Minecraft client) {
@@ -110,6 +128,17 @@ public final class PreviewHook {
                         boolean taken = screen.mouseClicked(event, false);
                         ModernConfigClient.LOGGER
                                 .info("PREVIEW: click at " + cx + "," + cy + " -> " + taken);
+                    }
+                }
+                if (c2x >= 0 && !this.clicked2 && this.ticks >= 90) {
+                    this.clicked2 = true;
+                    if (client.screen instanceof ModernConfigScreen screen) {
+                        var event = new net.minecraft.client.input.MouseButtonEvent(c2x, c2y,
+                                new net.minecraft.client.input.MouseButtonInfo(
+                                        org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT, 0));
+                        boolean taken = screen.mouseClicked(event, false);
+                        ModernConfigClient.LOGGER
+                                .info("PREVIEW: click2 at " + c2x + "," + c2y + " -> " + taken);
                     }
                 }
             }

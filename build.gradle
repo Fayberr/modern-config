@@ -60,6 +60,9 @@ loom {
 			if (project.hasProperty('mcPreviewClick')) {
 				vmArg "-Dmodernconfig.previewClick=${project.property('mcPreviewClick')}"
 			}
+			if (project.hasProperty('mcPreviewClick2')) {
+				vmArg "-Dmodernconfig.previewClick2=${project.property('mcPreviewClick2')}"
+			}
 		}
 	}
 }
