@@ -93,7 +93,7 @@ public final class PreviewHook {
             @Override
             public void onEndTick(net.minecraft.client.Minecraft client) {
                 if (!this.opened) {
-                    if (!(client.screen instanceof TitleScreen)) {
+                    if (!(client.gui.screen() instanceof TitleScreen)) {
                         return;
                     }
                     if (++this.ticks < 20) {
@@ -101,27 +101,27 @@ public final class PreviewHook {
                     }
                     this.opened = true;
                     ModernConfigClient.LOGGER.info("PREVIEW: opening demo screen");
-                    client.setScreen(demoScreen());
+                    client.setScreenAndShow(demoScreen());
                     return;
                 }
                 this.ticks++;
                 if (tabTarget >= 0 && !this.tabbed && this.ticks >= 30) {
                     this.tabbed = true;
-                    if (client.screen instanceof ModernConfigScreen screen) {
+                    if (client.gui.screen() instanceof ModernConfigScreen screen) {
                         screen.selectTab(tabTarget);
                         ModernConfigClient.LOGGER.info("PREVIEW: tab set to " + tabTarget);
                     }
                 }
                 if (target > 0.0 && !this.scrolled && this.ticks >= 45) {
                     this.scrolled = true;
-                    if (client.screen instanceof ModernConfigScreen screen) {
+                    if (client.gui.screen() instanceof ModernConfigScreen screen) {
                         screen.entryList().smoothScrollTo(target);
                         ModernConfigClient.LOGGER.info("PREVIEW: scroll set to " + target);
                     }
                 }
                 if (cx >= 0 && !this.clicked && this.ticks >= 60) {
                     this.clicked = true;
-                    if (client.screen instanceof ModernConfigScreen screen) {
+                    if (client.gui.screen() instanceof ModernConfigScreen screen) {
                         var event = new net.minecraft.client.input.MouseButtonEvent(cx, cy,
                                 new net.minecraft.client.input.MouseButtonInfo(
                                         org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT, 0));
@@ -132,7 +132,7 @@ public final class PreviewHook {
                 }
                 if (c2x >= 0 && !this.clicked2 && this.ticks >= 90) {
                     this.clicked2 = true;
-                    if (client.screen instanceof ModernConfigScreen screen) {
+                    if (client.gui.screen() instanceof ModernConfigScreen screen) {
                         var event = new net.minecraft.client.input.MouseButtonEvent(c2x, c2y,
                                 new net.minecraft.client.input.MouseButtonInfo(
                                         org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT, 0));

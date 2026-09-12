@@ -44,8 +44,8 @@ public class ModernConfigClient implements ClientModInitializer {
                 dispatcher.register(ClientCommands.literal("modernconfig")
                         .then(ClientCommands.literal("demo").executes(context -> {
                             Minecraft client = context.getSource().getClient();
-                            // Route through the client thread: setScreen is only safe there.
-                            client.execute(() -> client.setScreen(
+                            // Route through the client thread: setScreenAndShow is only safe there.
+                            client.execute(() -> client.setScreenAndShow(
                                     net.fayber.modernconfig.dev.PreviewHook.demoScreen()));
                             return Command.SINGLE_SUCCESS;
                         }))));

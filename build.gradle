@@ -29,8 +29,10 @@ dependencies {
 
 	// The GUI toolkit (widgets, Theme, CardList, Ui). Published to mavenLocal by the Modern GUI
 	// project. Not bundled: modern-gui is a declared dependency (fabric.mod.json depends), so one
-	// standalone copy serves every consumer. 26.1 is obfuscation-free, so no remapping is involved.
-	implementation "net.fayber:modern-gui:${project.modern_gui_version}"
+	// standalone copy serves every consumer. 26.x is obfuscation-free, so no remapping is involved.
+	// Uses the MC-version-suffixed maven coordinate (see gradle.properties); the fabric.mod.json
+	// depends bound below uses the plain modern_gui_version instead.
+	implementation "net.fayber:modern-gui:${project.modern_gui_maven_version}"
 
 	// Cloth Config: compile against it for the bridge mixins, never ship or require it.
 	compileOnly("me.shedaniel.cloth:cloth-config-fabric:${project.cloth_config_version}") {
@@ -105,6 +107,11 @@ publishing {
 		create('mavenJava', MavenPublication) {
 			// Publish under modern-config (the archivesBaseName), not the project name.
 			artifactId = project.archives_base_name
+			// mavenLocal has no MC-version axis: suffix the LOCAL coordinate only (jar filename
+			// and fabric.mod.json embedded version stay the clean version number) so a future
+			// consumer building against this 26.2 folder cannot collide with the 26.1.x folder's
+			// plain-numbered coordinate for the same version. Mirrors modern-gui's build.gradle.
+			version = "${project.version}+26.2"
 			from components.java
 		}
 	}

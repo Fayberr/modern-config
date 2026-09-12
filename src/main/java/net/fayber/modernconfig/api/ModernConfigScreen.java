@@ -320,7 +320,7 @@ public class ModernConfigScreen extends Screen {
         if (this.onSave != null) {
             this.onSave.run();
         }
-        this.minecraft.setScreen(this.parent);
+        this.minecraft.setScreenAndShow(this.parent);
     }
 
     @Override
@@ -332,7 +332,7 @@ public class ModernConfigScreen extends Screen {
                 entry.restore();
             }
         }
-        this.minecraft.setScreen(this.parent);
+        this.minecraft.setScreenAndShow(this.parent);
     }
 
     @Override

@@ -148,7 +148,7 @@ public final class ClothBridge {
 
             if (BridgePrefs.showFallbackButton()) {
                 builder.cornerButton("Use original menu",
-                        () -> Minecraft.getInstance().setScreen(clothScreen));
+                        () -> Minecraft.getInstance().setScreenAndShow(clothScreen));
             }
 
             // The screen translated cleanly, so remember how it was built: Cloth's own screen gets
@@ -201,7 +201,7 @@ public final class ClothBridge {
         Screen modern = translate(request.title(), request.parent(), request.categories(),
                 request.savingRunnable(), clothScreen);
         if (modern != null) {
-            Minecraft.getInstance().setScreen(modern);
+            Minecraft.getInstance().setScreenAndShow(modern);
         }
     }
 
