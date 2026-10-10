@@ -23,8 +23,8 @@ public final class PreviewHook {
     /** Detail levels for the cycle demo, in cycle order. */
     private static final String[] DETAIL_OPTIONS = {"Low", "Medium", "High"};
 
-    /** GLFW keycode for G, the toggle keybind's declared default. */
-    private static final int GLFW_KEY_G = 71;
+    /** SDL scancode for G, the toggle keybind's declared default. */
+    private static final int SDL_KEY_G = com.mojang.blaze3d.platform.InputConstants.KEY_G;
 
     private PreviewHook() {
     }
@@ -124,7 +124,7 @@ public final class PreviewHook {
                     if (client.gui.screen() instanceof ModernConfigScreen screen) {
                         var event = new net.minecraft.client.input.MouseButtonEvent(cx, cy,
                                 new net.minecraft.client.input.MouseButtonInfo(
-                                        org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT, 0));
+                                        com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 0));
                         boolean taken = screen.mouseClicked(event, false);
                         ModernConfigClient.LOGGER
                                 .info("PREVIEW: click at " + cx + "," + cy + " -> " + taken);
@@ -135,7 +135,7 @@ public final class PreviewHook {
                     if (client.gui.screen() instanceof ModernConfigScreen screen) {
                         var event = new net.minecraft.client.input.MouseButtonEvent(c2x, c2y,
                                 new net.minecraft.client.input.MouseButtonInfo(
-                                        org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT, 0));
+                                        com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 0));
                         boolean taken = screen.mouseClicked(event, false);
                         ModernConfigClient.LOGGER
                                 .info("PREVIEW: click2 at " + c2x + "," + c2y + " -> " + taken);
@@ -165,7 +165,7 @@ public final class PreviewHook {
                 .text("Display Name", () -> s.displayName, v -> s.displayName = v, 32, "Player")
                 .error(() -> s.displayName.isBlank() ? "Name cannot be empty." : null)
                 .color("Accent Color", () -> s.accentColor, v -> s.accentColor = v, 0xFF3B82F6)
-                .keybind("Toggle Key", () -> s.toggleKey, v -> s.toggleKey = v, GLFW_KEY_G)
+                .keybind("Toggle Key", () -> s.toggleKey, v -> s.toggleKey = v, SDL_KEY_G)
                 .bool("High Contrast", () -> s.highContrast, v -> s.highContrast = v, true)
                 .requiresRestart()
                 .tooltip("The change applies after a restart.")
@@ -194,7 +194,7 @@ public final class PreviewHook {
         String theme = "Auto";
         String displayName = "Player";
         int accentColor = 0xFF3B82F6;
-        int toggleKey = 79; // GLFW_KEY_O; not the default, so the reset button shows
+        int toggleKey = com.mojang.blaze3d.platform.InputConstants.KEY_O; // KEY_O; not the default, so the reset button shows
         boolean highContrast = true;
         int range = 16;
         double scale = 1.0;

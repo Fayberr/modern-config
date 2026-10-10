@@ -615,7 +615,7 @@ public final class ClothBridge {
         return out;
     }
 
-    /** Cloth bind to toolkit code: GLFW keycodes as-is, mouse buttons at 1000 + button. */
+    /** Cloth bind to toolkit code: SDL scancodes as-is, mouse buttons at 1000 + button. */
     private static int keyCodeOf(me.shedaniel.clothconfig2.api.ModifierKeyCode bind) {
         com.mojang.blaze3d.platform.InputConstants.Key key = bind.getKeyCode();
         if (key == null) {
@@ -624,7 +624,7 @@ public final class ClothBridge {
         if (key.getType() == com.mojang.blaze3d.platform.InputConstants.Type.MOUSE) {
             return net.fayber.moderngui.widget.KeybindField.MOUSE_CODE_BASE + key.getValue();
         }
-        if (key.getType() == com.mojang.blaze3d.platform.InputConstants.Type.KEYSYM) {
+        if (key.getType() == com.mojang.blaze3d.platform.InputConstants.Type.KEYBOARD) {
             return key.getValue();
         }
         // Scan codes have no faithful int form in the toolkit's convention: shows as unbound,
@@ -643,7 +643,7 @@ public final class ClothBridge {
         var key = mouse
                 ? com.mojang.blaze3d.platform.InputConstants.Type.MOUSE
                         .getOrCreate(code - net.fayber.moderngui.widget.KeybindField.MOUSE_CODE_BASE)
-                : com.mojang.blaze3d.platform.InputConstants.Type.KEYSYM.getOrCreate(code);
+                : com.mojang.blaze3d.platform.InputConstants.Type.KEYBOARD.getOrCreate(code);
         staged.put(entry, me.shedaniel.clothconfig2.api.ModifierKeyCode.copyOf(current).setKeyCode(key));
     }
 

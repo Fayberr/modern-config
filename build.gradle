@@ -111,7 +111,7 @@ publishing {
 			// and fabric.mod.json embedded version stay the clean version number) so a future
 			// consumer building against this 26.2 folder cannot collide with the 26.1.x folder's
 			// plain-numbered coordinate for the same version. Mirrors modern-gui's build.gradle.
-			version = "${project.version}+26.2"
+			version = "${project.version}+26.3"
 			from components.java
 		}
 	}
