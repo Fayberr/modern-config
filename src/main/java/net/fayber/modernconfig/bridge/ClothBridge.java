@@ -450,6 +450,7 @@ public final class ClothBridge {
             return "'" + label + "' is a " + kindOf(entry) + ", which is not supported";
         }
 
+        builder.visibleWhen(() -> entry.getDisplayRequirement() == null || entry.getDisplayRequirement().check());
         tooltipOf(entry).ifPresent(builder::tooltip);
         return null;
     }
@@ -467,7 +468,16 @@ public final class ClothBridge {
                                  Object[] values, Map<Object, Object> staged) {
         builder.cycle(label,
                 () -> current(staged, entry, ((me.shedaniel.clothconfig2.api.ValueHolder<?>) entry).getValue()),
-                v -> staged.put(entry, v),
+                v -> {
+                    staged.put(entry, v);
+                    // Cloth requirements read the selector's entry value. Keep its UI value
+                    // in sync with the staged edit without invoking any save consumer.
+                    if (entry instanceof SelectionListEntry<?>) {
+                        var accessor = (SelectionListEntryAccessor) (Object) entry;
+                        int index = accessor.modernconfig$values().indexOf(v);
+                        if (index >= 0) accessor.modernconfig$index().set(index);
+                    }
+                },
                 values,
                 ClothBridge::displayName,
                 defaultOf(entry));

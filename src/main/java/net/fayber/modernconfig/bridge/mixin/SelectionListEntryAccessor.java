@@ -12,6 +12,9 @@ import org.spongepowered.asm.mixin.gen.Accessor;
  */
 @Mixin(SelectionListEntry.class)
 public interface SelectionListEntryAccessor {
+    @Accessor("index")
+    java.util.concurrent.atomic.AtomicInteger modernconfig$index();
+
     @Accessor("values")
     ImmutableList<?> modernconfig$values();
 }
