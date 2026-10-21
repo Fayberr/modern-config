@@ -101,7 +101,7 @@ public class GenIcon {
         return parse(element);
     }
 
-    // ------------------------------------------------------------------ path parser
+    // path parser
     // Same parser as Modern GUI's tools/gen-icons.java (M/L/H/V/C/S/Q/T/A/Z with
     // relative forms and implicit repeats); kept verbatim so both mods rasterise
     // identically.
