@@ -163,3 +163,11 @@ public class MyModMenu implements ModMenuApi {
 - Modern GUI as a runtime dependency of Modern Config itself; Fabric API.
 - Mod Menu optional, for the config button.
 - Licenses: Modern Config GPL-3.0-or-later, Modern GUI LGPL-3.0-or-later.
+
+## Conditional options
+
+Chain `.visibleWhen(() -> condition)` after a native builder entry to hide its row until the condition is true. Hidden rows collapse and do not receive input. Conditions combine with the active tab and update live.
+
+The Cloth bridge also preserves display requirements dependent on enum/selection values. Selector edits update the Cloth entry's UI state without calling its save consumer, so a dependent slider appears immediately while Save and Cancel retain their usual behavior.
+
+Client smoke: with Cloth Config in `run/mods`, run `JAVA_TOOL_OPTIONS=-Dmodernconfig.previewConditional=true ./gradlew runClient -PmcPreview=true` under a display. It checks selector-driven visibility, retaining a hidden slider's count, staged edits, Cancel, and Save, then exits with `CONDITIONAL_SMOKE_PASS` in the log.
