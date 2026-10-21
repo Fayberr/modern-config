@@ -101,7 +101,11 @@ public final class PreviewHook {
                     }
                     this.opened = true;
                     ModernConfigClient.LOGGER.info("PREVIEW: opening demo screen");
-                    client.setScreen(demoScreen());
+                    if (Boolean.getBoolean("modernconfig.previewConditional")) {
+                        ConditionalPreview.run(client);
+                    } else {
+                        client.setScreen(demoScreen());
+                    }
                     return;
                 }
                 this.ticks++;
