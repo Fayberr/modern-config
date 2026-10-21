@@ -78,6 +78,7 @@ public class ModernConfigScreen extends Screen {
     private final List<Component> tabLabels;
     /** Parallel to entries: the tab index each entry belongs to, or -1 for always visible. */
     private final List<Integer> tabOfEntries;
+    private final List<EntryVisibility> visibility;
     /** Small secondary action pinned to the true bottom right corner, outside the card column. */
     @Nullable
     private final CornerButton cornerButton;
@@ -112,7 +113,7 @@ public class ModernConfigScreen extends Screen {
     ModernConfigScreen(Component title, @Nullable Screen parent, @Nullable Runnable onSave,
                        List<ConfigEntry> entries, List<ConfigEntryList.OptionState> optionStates,
                        @Nullable CornerButton cornerButton,
-                       List<Component> tabLabels, List<Integer> tabOfEntries) {
+                       List<Component> tabLabels, List<Integer> tabOfEntries, List<EntryVisibility> visibility) {
         // Kept raw: the Inter variant depends on the GUI scale, so it is applied at draw time.
         super(title);
         this.parent = parent;
@@ -122,6 +123,7 @@ public class ModernConfigScreen extends Screen {
         this.cornerButton = cornerButton;
         this.tabLabels = tabLabels;
         this.tabOfEntries = tabOfEntries;
+        this.visibility = visibility;
     }
 
     public static Builder builder(Component title, @Nullable Screen parent, @Nullable Runnable onSave) {
@@ -309,10 +311,15 @@ public class ModernConfigScreen extends Screen {
     }
 
     private void applyVisibility() {
+        boolean changed = false;
         for (int i = 0; i < this.rows.size(); i++) {
-            int tab = this.tabOfEntries.get(i);
-            this.rows.get(i).setVisible(tab < 0 || tab == this.activeTab);
+            boolean visible = this.visibility.get(i).isVisible(this.tabOfEntries.get(i), this.activeTab);
+            if (this.rows.get(i).isVisible() != visible) {
+                this.rows.get(i).setVisible(visible);
+                changed = true;
+            }
         }
+        if (changed && this.list != null) this.list.setScrollAmount(this.list.scrollAmount());
     }
 
     private void saveAndClose() {
@@ -336,7 +343,14 @@ public class ModernConfigScreen extends Screen {
     }
 
     @Override
+    public void tick() {
+        super.tick();
+        this.applyVisibility();
+    }
+
+    @Override
     public void extractRenderState(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
+        this.applyVisibility();
         // Backdrop and title must be extracted before super (which extracts the widgets), because
         // within one stratum extraction order is draw order.
         gfx.fill(0, 0, this.width, this.height, this.theme.scrim);
@@ -365,6 +379,7 @@ public class ModernConfigScreen extends Screen {
         private final List<Component> tabs = new ArrayList<>();
         /** Parallel to entries: the tab each entry was added under, or -1 before the first tab. */
         private final List<Integer> tabOfEntries = new ArrayList<>();
+        private final List<EntryVisibility> visibility = new ArrayList<>();
         private int currentTab = -1;
         @Nullable
         private CornerButton cornerButton;
@@ -392,6 +407,7 @@ public class ModernConfigScreen extends Screen {
             this.tabOfEntries.add(this.currentTab);
             this.entries.add(entry);
             this.states.add(ConfigEntryList.OptionState.DEFAULT);
+            this.visibility.add(new EntryVisibility(() -> true));
             return entry;
         }
 
@@ -416,6 +432,14 @@ public class ModernConfigScreen extends Screen {
             return this.decorate(new ConfigEntryList.OptionState(true,
                     current == null ? null : current.condition(),
                     current == null ? null : current.errorSupplier()));
+        }
+
+        /** Hides the preceding option and collapses its row while the condition is false. */
+        public Builder visibleWhen(BooleanSupplier condition) {
+            if (!this.visibility.isEmpty()) {
+                this.visibility.set(this.visibility.size() - 1, new EntryVisibility(condition));
+            }
+            return this;
         }
 
         /**
@@ -909,7 +933,7 @@ public class ModernConfigScreen extends Screen {
         public ModernConfigScreen build() {
             return new ModernConfigScreen(this.title, this.parent, this.onSave,
                     List.copyOf(this.entries), List.copyOf(this.states), this.cornerButton,
-                    List.copyOf(this.tabs), List.copyOf(this.tabOfEntries));
+                    List.copyOf(this.tabs), List.copyOf(this.tabOfEntries), List.copyOf(this.visibility));
         }
     }
 }
