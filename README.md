@@ -1,5 +1,7 @@
 # Modern Config
 
+> Work in progress: this library is still in development. Expect API changes and unfinished screens. Cloth Config remains the stable option for player-facing settings.
+
 Config screens for Fabric mods. Each option is a card in one scrolling column; changes preview
 live while the screen is open, and Cancel or ESC puts every value back the way it was. Options
 are declared with a one-line builder call each. A bridge can also render existing Cloth Config
