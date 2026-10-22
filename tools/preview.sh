@@ -18,7 +18,10 @@ SCROLL_SET="${4:-}"
 DISPLAY_NUM="${MC_DISPLAY:-:97}"
 W=1280
 H=720
-JDK="${MC_JDK:-/home/fayber/.jdks/jdk-25.0.4+7}"
+JDK="${MC_JDK:-${JAVA_HOME:-}}"
+if [[ -z "$JDK" ]]; then
+	JDK="$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")"
+fi
 
 cleanup() {
 	[[ -n "${GRADLE_PID:-}" ]] && kill -9 "$GRADLE_PID" 2>/dev/null
