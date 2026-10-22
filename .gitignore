@@ -24,3 +24,4 @@ bin/
 
 # macos
 .DS_Store
+logs/
