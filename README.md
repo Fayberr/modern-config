@@ -133,10 +133,10 @@ public final class ConfigScreenRouter {
 }
 ```
 
-A complete working example lives in the Waypoints mod:
-`compat/ConfigScreenRouter.java` picks the screen and `compat/WaypointsModernScreen.java`
-binds fifteen config fields through the builder, with the same router wired into both Mod Menu
-and an in-game Settings button.
+The usual setup keeps each screen in its own class: `compat/ConfigScreenRouter.java`
+picks the screen and a `*ModernScreen.java` binds the config fields through the
+builder, with the same router wired into both Mod Menu and an in-game Settings
+button.
 
 ## Mod Menu
 
