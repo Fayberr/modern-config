@@ -7,12 +7,12 @@ screens in the same look.
 
 This page is written for mod developers. Players only need the jar: it requires the
 [Modern GUI](https://modrinth.com/mod/modern-gui-lib) library next to it (declared as a
-dependency on Modrinth, so launchers install both), and `/modernconfig demo` opens a screen
+dependency in the mod metadata), and `/modernconfig demo` opens a screen
 with one of every option type.
 
 ## Adding it to your mod
 
-The artifact is `net.fayber:modern-config`. Until the Modrinth maven is live, it comes from
+The artifact is `net.fayber:modern-config`. For local development, it comes from
 mavenLocal on machines where Modern Config was built with `./gradlew publishToMavenLocal`:
 
 ```groovy
@@ -22,14 +22,13 @@ repositories {
 
 dependencies {
     // compileOnly: your mod compiles against the API without shipping it
-    compileOnly "net.fayber:modern-config:1.9.1"
+    compileOnly "net.fayber:modern-config:1.9.5+26.3"
     // runtimeOnly pulls it into the dev client, so the integration is exercised on every boot
-    runtimeOnly "net.fayber:modern-config:1.9.1"
+    runtimeOnly "net.fayber:modern-config:1.9.5+26.3"
 }
 ```
 
-Once the Modrinth project is approved, the same coordinates are available as
-`maven.modrinth:modern-config:<version>` from `https://api.modrinth.com/maven`.
+Public Maven distribution is not available yet. Build both libraries locally using the steps below.
 
 Declare the mod optional in your `fabric.mod.json` so your screen becomes a fallback target
 rather than a hard requirement:
@@ -159,7 +158,7 @@ public class MyModMenu implements ModMenuApi {
 
 ## Requirements
 
-- Minecraft 26.1.x (Fabric Loader 0.19.3+), Java 25.
+- Minecraft 26.3 (Fabric Loader 0.19.5+), Java 25.
 - Modern GUI as a runtime dependency of Modern Config itself; Fabric API.
 - Mod Menu optional, for the config button.
 - Licenses: Modern Config GPL-3.0-or-later, Modern GUI LGPL-3.0-or-later.
@@ -171,3 +170,16 @@ Chain `.visibleWhen(() -> condition)` after a native builder entry to hide its r
 The Cloth bridge also preserves display requirements dependent on enum/selection values. Selector edits update the Cloth entry's UI state without calling its save consumer, so a dependent slider appears immediately while Save and Cancel retain their usual behavior.
 
 Client smoke: with Cloth Config in `run/mods`, run `JAVA_TOOL_OPTIONS=-Dmodernconfig.previewConditional=true ./gradlew runClient -PmcPreview=true` under a display. It checks selector-driven visibility, retaining a hidden slider's count, staged edits, Cancel, and Save, then exits with `CONDITIONAL_SMOKE_PASS` in the log.
+
+## Build from a fresh checkout
+
+Use JDK 25 and the included Gradle wrapper. Select the same Minecraft branch in both
+[Modern GUI](https://github.com/Fayberr/modern-gui) and
+[Modern Config](https://github.com/Fayberr/modern-config): `fabric/26.1.x`, `fabric/26.2` or `fabric/26.3`.
+
+1. In Modern GUI, run `./gradlew build publishToMavenLocal`.
+2. In Modern Config, run `./gradlew test build publishToMavenLocal`.
+
+On Windows, use `gradlew.bat`. Artifacts are written to `build/libs`. The 26.2 and 26.3
+Maven coordinates include the Minecraft version suffix; see `gradle.properties` and
+the `publishing` block in `build.gradle`. The jar's mod version has no Minecraft suffix.
