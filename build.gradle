@@ -11,8 +11,7 @@ base {
 }
 
 repositories {
-	// The embedded modern-gui toolkit comes from mavenLocal (publish it with
-	// `publishToMavenLocal` from the Modern GUI project first).
+	// Publish the matching Modern GUI branch with `publishToMavenLocal` first.
 	mavenLocal()
 
 	// Cloth Config, for the optional bridge only: compileOnly, guarded by a mixin plugin, so
@@ -92,6 +91,7 @@ java {
 }
 
 jar {
+	from('INTER-OFL.txt')
 	from('LICENSE') {
 		rename { "${it}_${project.base.archivesName.get()}" }
 	}
